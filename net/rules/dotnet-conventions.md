@@ -33,7 +33,7 @@ o lugar dela é lá, não aqui. Mantenha este arquivo enxuto.
 
 ## §2 — Layout da solution e regra de dependência
 - **CONV-005** Quatro projetos: `Domain`, `Application`, `Infrastructure`, `Api`. Dependências fluem **só para dentro**.
-- **CONV-006** `Domain` depende só da BCL e do FluentResults (lib pura). Sem ORM, framework ou infra.
+- **CONV-006** `Domain` depende só da BCL e do JacksonVeroneze.NET.Result (lib pura). Sem ORM, framework ou infra.
 - **CONV-007** `Application` → `Domain`. `Infrastructure` → `Application` (+ `Domain`). `Api` → `Application` + `Infrastructure` (apenas composition root).
 - **CONV-008** Camada de baixo NÃO DEVE referenciar camada de cima. Enforçado por project reference.
 - **CONV-009** Organização por **vertical slice dentro de cada camada**, não por tipo técnico. Os arquivos de uma feature ficam em `Features/{Aggregate}/{UseCase}/`.
@@ -86,27 +86,27 @@ tests/
 - **CONV-070** NÃO DEVE expor entidades de persistência (EF) em contratos de API — usar DTOs da Application (§10).
 - **CONV-071** `System.Text.Json` para serialização. `Newtonsoft.Json` é PROIBIDO.
 
-## §6 — Contrato de resultado (FluentResults) — compartilhado
+## §6 — Contrato de resultado (JacksonVeroneze.NET.Result) — compartilhado
 - **CONV-019** Todo use case retorna `Task<Result<TResponse>>` (ou `Task<Result>` quando void). NÃO DEVE lançar exceção para falha esperada/de negócio.
 - **CONV-020** Exceção só para o realmente excepcional (bug, infra fora). Nunca para fluxo de controle.
 - **CONV-021** Falha DEVE usar um erro tipado da taxonomia em `Domain/Common/Errors`. NÃO DEVE usar `Result.Fail("string")` numa borda.
-- **CONV-022** NÃO DEVE serializar `IError`/`Result` do FluentResults direto. Mapear para `ProblemDetails` (§10).
+- **CONV-022** NÃO DEVE serializar `Error`/`Result` do JacksonVeroneze.NET.Result direto. Mapear para `ProblemDetails` (§10).
 - **CONV-083** NÃO DEVE engolir exceção (catch vazio, ou catch-log-continua sem tratar).
 
 Taxonomia de erro (componente compartilhado — base + subclasses, cada uma com `Code` estável):
 ```csharp
-public abstract class AppError : Error
-{
-    protected AppError(string code, string message) : base(message) => WithMetadata("code", code);
-    public string Code => Metadata.TryGetValue("code", out var c) ? (string)c : "unknown";
-}
+// public abstract class AppError : Error
+// {
+//     protected AppError(string code, string message) : base(message) => WithMetadata("code", code);
+//     public string Code => Metadata.TryGetValue("code", out var c) ? (string)c : "unknown";
+// }
 
-public sealed class ValidationError(string message)   : AppError("validation", message);
-public sealed class NotFoundError(string message)     : AppError("not_found", message);
-public sealed class ConflictError(string message)     : AppError("conflict", message);       // 409
-public sealed class BusinessRuleError(string message) : AppError("business_rule", message);  // 422 — regra violada / estado inválido
-public sealed class UnauthorizedError(string message) : AppError("unauthorized", message);
-public sealed class ForbiddenError(string message)    : AppError("forbidden", message);
+// public sealed class ValidationError(string message)   : AppError("validation", message);
+// public sealed class NotFoundError(string message)     : AppError("not_found", message);
+// public sealed class ConflictError(string message)     : AppError("conflict", message);       // 409
+// public sealed class BusinessRuleError(string message) : AppError("business_rule", message);  // 422 — regra violada / estado inválido
+// public sealed class UnauthorizedError(string message) : AppError("unauthorized", message);
+// public sealed class ForbiddenError(string message)    : AppError("forbidden", message);
 ```
 
 ## §7 — Domain
