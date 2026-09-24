@@ -1,6 +1,6 @@
 ---
 name: create-value-object
-description: 'Cria um value object de domínio (.NET/C#, camada Domain, sem identidade) — tipos de valor como Money, Cpf, Cnpj, Email, AccountNumber, Cep, Currency, PhoneNumber. Use sempre que o usuário pedir um value object, VO ou tipo de valor, mesmo sem usar o termo (ex. um tipo para representar dinheiro, ou um Cpf com validação). Não use para entidades com identidade (create-entity) nem para DTOs de request/response.'
+description: 'Cria um value object de domínio (.NET/C#, camada Domain, sem identidade) em Domain/ValueObjects — tipos de valor como Money, Cpf, Cnpj, Email, AccountNumber, Cep, Currency, PhoneNumber. Use sempre que o usuário pedir um value object, VO ou tipo de valor, mesmo sem usar o termo (ex. um tipo para representar dinheiro, ou um Cpf com validação). Não use para entidades com identidade (create-entity) nem para DTOs de request/response.'
 ---
 
 # Criar Value Object (.NET / Clean Architecture)
@@ -9,10 +9,11 @@ Gera **um** value object (VO) de domínio conforme a `dotnet-conventions.md` na 
 Esta skill é a fábrica; a rule é o contrato. Cite os CONV pelo ID ao justificar decisões.
 
 ## O que gera
-Um único arquivo: `src/main/Domain/{Aggregate}/{Name}.cs` (VO de agregado) **ou**
-`src/main/Domain/ValueObjects/{Name}.cs` (VO compartilhado, ex.: `Money`, `Email`). Ajuste ao
-layout real do repo. O tipo é um `sealed record` imutável, construído só pela factory `Create(...)`,
-com os erros das invariantes declarados como **propriedades `static Error` no próprio VO**.
+Um único arquivo: `{DomainProjectDir}/ValueObjects/{Name}.cs`, onde `{DomainProjectDir}` é a
+pasta do `.csproj` do projeto Domain. **Todo VO vai em `ValueObjects/`** — não há VO por agregado.
+
+O tipo é um `sealed record` imutável, construído só pela factory `Create(...)`, com os erros das
+invariantes declarados como **campos `private static readonly Error` no próprio VO**.
 
 ## Escopo (quando usar / NÃO usar)
 - **Usar:** o conceito é um **valor sem identidade** (dois iguais são intercambiáveis).
@@ -21,58 +22,78 @@ com os erros das invariantes declarados como **propriedades `static Error` no pr
 ## Contrato
 
 ### Rules enforçadas (CONV)
-- **CONV-025** VO imutável, igualdade por valor, auto-validado via factory.
+- **CONV-025 / CONV-068** VO é `sealed record` imutável, igualdade por valor, auto-validado via factory — mesmo com comportamento.
+- **CONV-085** `Create` retorna `Result<{Name}>`; invariante violada → `FromInvalid(error)`.
+- **CONV-021** cada erro é `Error.Create("{Name}.{Reason}", ...)` declarado uma vez no VO. **CONV-069** nunca `null`/`throw` para regra.
 - **CONV-059** dinheiro é `decimal` no VO `Money`; nunca `float`/`double`.
-- **CONV-021 / CONV-069** falha vira `Error` tipado via `Result` (`FromInvalid`) — nunca `null`, nunca `throw` para regra.
-- **CONV-063** identificadores em inglês. **CONV-064** `sealed`. **CONV-065** acesso mais restritivo.
+- **CONV-086** regex com timeout, tamanho verificado antes, âncoras `\A`/`\z`.
+- **CONV-054** VO que carrega PII não expõe o valor em `ToString()`.
+- **CONV-063** identificadores em inglês, exceto termos brasileiros sem tradução (`Cpf`, `Cnpj`, `Cep`).
+- **CONV-064** `sealed`. **CONV-065** acesso mais restritivo. **CONV-015** `private static readonly` e `const` em PascalCase.
 - **CONV-006 / CONV-024** Domain puro: sem EF/ORM, sem atributo de persistência, sem I/O.
-- **CONV-011/012/013** file-scoped namespace, um tipo por arquivo, namespace espelha a pasta.
+- **CONV-011/012/013** file-scoped namespace, um tipo por arquivo, namespace = RootNamespace do `.csproj` + pasta.
+- **CONV-087** nenhum pacote novo sem confirmação.
 
 ### Pré-condições
-O `Domain` referencia a lib de resultado do projeto (`JacksonVeroneze.NET.Result` — `Result`/`Error`),
-com `global using`. **Os erros do VO ficam no próprio VO** (propriedades `static Error`), não num
-arquivo central nem inline. Um `DomainErrors.cs` central, se existir, é para erros de entidade/use-case,
-não para VO.
+O projeto Domain referencia `JacksonVeroneze.NET.Result` (`Result`, `Result<T>`, `Error`,
+`ResultType`).
 
 ### Inputs
-1. **Name** — em inglês, PascalCase (`Money`, `Email`, `AccountNumber`).
-2. **Escopo** — `ValueObjects` (compartilhado) ou o agregado dono (`Accounts`).
-3. **Fields** — o(s) valor(es) encapsulado(s) e tipo(s).
-4. **Invariantes** — as regras de validação (formato, faixa, obrigatoriedade). Cada uma vira um `Error` estático.
-5. **RootNamespace** — resolvido por ReAct, não perguntado de cara.
+1. **Name** — em inglês, PascalCase (`Money`, `Email`, `AccountNumber`); termos brasileiros sem tradução ficam no original (`Cpf`, `Cnpj`, `Cep`).
+2. **Fields** — o(s) valor(es) encapsulado(s) e tipo(s).
+3. **Invariantes** — as regras de validação (formato, faixa, obrigatoriedade). Cada uma vira um `Error`.
+4. **RootNamespace** — resolvido por ReAct a partir do `.csproj`, nunca perguntado de cara.
 
-Faltando Name, Fields ou Invariantes e sem inferência segura, pergunte antes de gerar. Não
-invente invariante que o usuário não pediu.
+Faltando Name, Fields ou Invariantes e sem inferência segura, pergunte antes de gerar.
+**Não invente invariante que o usuário não pediu** (ex.: não proíba valor negativo em `Money`
+se ninguém pediu). Guard de tamanho antes de regex (CONV-086) não é invariante inventada: é
+defesa obrigatória.
 
 ## Fluxo (ReAct)
-1. **Resolver RootNamespace.** `<RootNamespace>` em `Directory.Build.props`; senão derive do
-   `namespace` de um arquivo existente em `Domain/**`; só pergunte se o Domain vazio.
-2. **Checar duplicidade.** Se `{Name}.cs` já existe, não sobrescreva: relate.
-3. **Alinhar estilo** a um VO irmão, se houver (mesma forma de erro e de factory).
-4. **Decidir** membros, invariantes e os `Error` estáticos (CoT abaixo).
-5. **Escrever** o arquivo no caminho correto.
-6. **Verificar** pelo Checklist + Harness.
+1. **Localizar o projeto Domain.** Encontre o `.csproj` do Domain (ex.: `find . -name "*Domain*.csproj"`).
+2. **Resolver RootNamespace a partir desse `.csproj`.** Nunca use o namespace dos exemplos desta skill.
+   - Preferencial: `dotnet msbuild <Domain.csproj> -getProperty:RootNamespace` — avalia o valor efetivo, defaults incluídos.
+   - Fallback: `<RootNamespace>` no `.csproj`; senão `<AssemblyName>`; senão o nome do arquivo `.csproj` sem extensão (default do MSBuild).
+   - Namespace do VO = `{RootNamespace}.ValueObjects`.
+3. **Checar usings globais.** Se o Domain já declara `global using JacksonVeroneze.NET.Result`
+   (`<Using Include="JacksonVeroneze.NET.Result" />` no `.csproj` ou `GlobalUsings.cs`), **não**
+   repita o `using` no arquivo (`IDE0005` é erro). Senão, declare-o.
+4. **Checar duplicidade.** Se `ValueObjects/{Name}.cs` já existe, não sobrescreva: relate.
+5. **Alinhar estilo** a um VO irmão em `ValueObjects/`, se houver.
+6. **Decidir** membros, invariantes, erros e PII (CoT abaixo).
+7. **Escrever** o arquivo.
+8. **Verificar** pelo Checklist + Harness.
 
 ## Raciocínio antes de escrever (CoT)
 - Tem **identidade**? Se sim, é entity → pare e use `create-entity`.
-- Quais campos são **parte do valor** (entram na igualdade)? Todos entram.
-- Qual o **mínimo de invariantes**? Cada uma vira um `static Error {Reason}` chaveado `{Name}.{Reason}` + uma guard clause.
-- Validação de **formato**? Use `[GeneratedRegex]` (BCL, source-gen) e torne o record `partial` — **sem lib externa**. Confirme antes de adicionar qualquer pacote.
-- Há **normalização** (trim, lower, tirar máscara)? Só depois de validar, no `WithSuccess`.
-- Precisa de **comportamento** (ex.: `Money.Add`)? Operação que pode falhar retorna `Result<T>`.
+- Quais campos são **parte do valor**? Todos entram na igualdade.
+- Qual o **mínimo de invariantes** pedido? Cada uma vira um `private static readonly Error {Reason}` com `Code` `{Name}.{Reason}` + uma guard clause **com chaves** retornando `FromInvalid`.
+- Validação de **formato**?
+  - Primeiro, tente sem regex (`Length`, `char.IsAsciiLetter`, `char.IsAsciiDigit`).
+  - Se regex for necessário, use `[GeneratedRegex(pattern, options, matchTimeoutMilliseconds)]`, torne o record `partial`, verifique o tamanho máximo **antes** do match, ancore com `\A…\z` e use quantificadores limitados sem aninhamento (CONV-086).
+  - Não capture `RegexMatchTimeoutException`.
+- Há **normalização** (lower, upper, tirar máscara)? Só depois de validar, no `WithSuccess`.
+- O valor é **PII** (Cpf, Cnpj, Email, PhoneNumber, AccountNumber)? Sobrescreva `ToString()` com máscara. O `ToString` sintetizado do record imprime o valor em log, exceção e debugger (CONV-054).
+- Precisa de **comportamento** (ex.: `Money.Add`)? Só se pedido.
+  - Retorna novo VO → `Result<{Name}>`; sem retorno → `Result`.
+  - Violação de regra entre valores válidos (ex.: somar moedas diferentes) → `FromRuleViolation`, não `FromInvalid`.
 
 ## Template canônico
-```csharp
-using JacksonVeroneze.NET.Result;
-// using System.Text.RegularExpressions;   // só quando usar [GeneratedRegex]
+`{RootNamespace}` é placeholder: substitua pelo valor resolvido no passo 2 do Fluxo, nunca
+copie literalmente.
 
-namespace {RootNamespace}.Domain.{Scope};
+```csharp
+// using System.Text.RegularExpressions;   // só quando usar [GeneratedRegex]
+// using JacksonVeroneze.NET.Result;       // só se não houver global using (passo 3)
+
+namespace {RootNamespace}.ValueObjects;
 
 public sealed record {Name}          // 'partial' só se usar source generator (ex.: [GeneratedRegex])
 {
-    // um Error estático por invariante, chaveado {Name}.{Reason}
-    public static Error {Reason} =>
-        Error.Create("{Name}.{Reason}", "<mensagem clara>");
+    // um Error por invariante, Code {Name}.{Reason}
+    private static readonly Error {Reason} =
+        Error.Create("{Name}.{Reason}", 
+            "<mensagem clara>");
 
     public {FieldType} {FieldName} { get; }
 
@@ -92,38 +113,51 @@ public sealed record {Name}          // 'partial' só se usar source generator (
         return Result<{Name}>.WithSuccess(
             new {Name}(/* valores normalizados */));
     }
+
+    // só para PII:
+    // public override string ToString() => /* valor mascarado */;
 }
 ```
 
 ## Exemplos (few-shot ❌/✅)
+Nos exemplos, `{RootNamespace}` também é placeholder. Os `using` aparecem como se **não**
+houvesse global using da lib.
 
-❌ Sem contexto — record público, `double`, `throw`, e erro montado inline:
+❌ Sem contexto — record público, `double`, `throw`, erro inline:
 ```csharp
-public record Money(double Amount, string Currency)               // público, mutável via with
+public record Money(double Amount, string Currency)               // posicional, ctor público
 {
     public static Money Create(double amount, string currency)
     {
-        if (amount < 0)
-            throw new ArgumentException("negative");               // exceção p/ regra esperada
+        if (amount < 0)                                            // invariante não pedida
+            throw new ArgumentException("negative");               // exceção p/ regra; sem chaves
         return new Money(amount, currency);                        // sem validar currency
     }
 }
 ```
 
-✅ Flagship — `Email` (formato via `[GeneratedRegex]`, record `partial`, normalização após validar):
+✅ Flagship — `Email` (regex com timeout e guard de tamanho, PII mascarada, normalização após validar):
 ```csharp
 using System.Text.RegularExpressions;
 using JacksonVeroneze.NET.Result;
 
-namespace Api.Domain.ValueObjects;
+namespace {RootNamespace}.ValueObjects;
 
 public sealed partial record Email
 {
-    public static Error Required =>
-        Error.Create("Email.Required", "Email is required.");
+    private const int MaxLength = 254;
 
-    public static Error InvalidFormat =>
-        Error.Create("Email.InvalidFormat", "Email format is invalid.");
+    private static readonly Error Required =
+        Error.Create("Email.Required", 
+            "Email is required.");
+
+    private static readonly Error TooLong =
+        Error.Create("Email.TooLong", 
+            "Email must have at most 254 characters.");
+
+    private static readonly Error InvalidFormat =
+        Error.Create("Email.InvalidFormat", 
+            "Email format is invalid.");
 
     public string Value { get; }
 
@@ -139,6 +173,11 @@ public sealed partial record Email
             return Result<Email>.FromInvalid(Required);
         }
 
+        if (value.Length > MaxLength)
+        {
+            return Result<Email>.FromInvalid(TooLong);
+        }
+
         if (!EmailRegex().IsMatch(value))
         {
             return Result<Email>.FromInvalid(InvalidFormat);
@@ -148,26 +187,35 @@ public sealed partial record Email
             new Email(value.ToLowerInvariant()));
     }
 
-    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.CultureInvariant)]
+    public override string ToString()
+    {
+        int atIndex = Value.IndexOf('@');
+
+        return $"{Value[0]}***{Value[atIndex..]}";
+    }
+
+    [GeneratedRegex(
+        @"\A[A-Za-z0-9._%+-]{1,64}@"
+        + @"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.){1,8}[A-Za-z]{2,63}\z",
+        RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 100)]
     private static partial Regex EmailRegex();
 }
 ```
 
-✅ Segundo caso — `Money` (dois campos, erros estáticos):
+✅ Segundo caso — `Money` (dois campos, negativo permitido, validação sem regex):
 ```csharp
 using JacksonVeroneze.NET.Result;
 
-namespace Api.Domain.ValueObjects;
+namespace {RootNamespace}.ValueObjects;
 
 public sealed record Money
 {
-    public static Error AmountNegative =>
-        Error.Create("Money.AmountNegative", 
-            "Amount cannot be negative.");
+    private const int CurrencyLength = 3;
 
-    public static Error InvalidCurrency =>
+    private static readonly Error InvalidCurrency =
         Error.Create("Money.InvalidCurrency", 
-            "Currency must be a 3-letter ISO code.");
+            "Currency must have exactly 3 letters.");
 
     public decimal Amount { get; }
 
@@ -179,19 +227,13 @@ public sealed record Money
         Currency = currency;
     }
 
-    public static Result<Money> Create(
-        decimal amount, string currency)
+    public static Result<Money> Create(decimal amount, string currency)
     {
-        if (amount < 0)
+        if (string.IsNullOrEmpty(currency)
+            || currency.Length != CurrencyLength
+            || !currency.All(char.IsAsciiLetter))
         {
-            return Result<Money>
-            .FromInvalid(AmountNegative);
-        }
-
-        if (string.IsNullOrWhiteSpace(currency) || currency.Length != 3)
-        {
-            return Result<Money>
-            .FromInvalid(InvalidCurrency);
+            return Result<Money>.FromInvalid(InvalidCurrency);
         }
 
         return Result<Money>.WithSuccess(
@@ -199,33 +241,50 @@ public sealed record Money
     }
 }
 ```
-Diferença: `sealed record` com ctor privado (construção só via `Create` — CONV-025/064); `decimal`
-(CONV-059); cada invariante é um `static Error {Name}.{Reason}` referenciado no `FromInvalid`, não
-uma string inline nem um arquivo central (CONV-021/069); formato por `[GeneratedRegex]` da BCL (sem
-lib nova); normalização só depois de validar.
+
+Diferença entre os exemplos ✅ e o ❌:
+- `sealed record` com ctor privado: construção só via `Create` (CONV-025/064).
+- `decimal` para dinheiro (CONV-059), e nenhuma invariante que não foi pedida: `Amount` aceita negativo.
+- Cada invariante é um `private static readonly Error` com `Code` `{Name}.{Reason}`, criado uma vez e referenciado no `FromInvalid` (CONV-021/085).
+- Regex só quando necessário, com timeout, guard de tamanho e âncoras `\A`/`\z` (CONV-086).
+- PII mascarada no `ToString` (CONV-054). Normalização só depois de validar.
 
 ## Anti-patterns (recusar)
 - Construtor público, positional record ou setter — quebra construção validada.
+- `class` em vez de `record` para VO, mesmo com comportamento (CONV-068).
 - `throw` para valor inválido em vez de `Result<{Name}>.FromInvalid(...)`.
-- **`Error` inline/repetido** (`Error.Create("Email", "msg")` espalhado) em vez de propriedade `static Error {Name}.{Reason}`.
-- Criar arquivo `{Name}Error` separado — o erro do VO mora **no VO**.
-- Validar formato com **lib externa** sem confirmar; use `[GeneratedRegex]` (BCL).
+- `Error` como propriedade expression-bodied (`static Error X => ...`) — aloca a cada acesso; use `static readonly`.
+- `Error` inline/repetido (`Error.Create(...)` dentro do `Create`) em vez de campo único.
+- Criar arquivo `{Name}Error` ou central de erros — o erro do VO mora **no VO**.
+- `Error` `public` — só o `Create` do VO usa; deve ser `private` (CONV-065). Testes validam por `HasErrorForCode`.
+- Failure sem `Error` (`FromInvalid()`) ou `Result<T>.WithSuccess()` sem valor (CONV-085).
+- `if` de validação **sem chaves** (`IDE0011` = error).
+- Regex sem timeout, sem guard de tamanho, ancorado com `^…$` ou com quantificador aninhado (CONV-086).
+- Capturar `RegexMatchTimeoutException` para devolver `FromInvalid`.
+- VO de PII sem `ToString` mascarado (CONV-054).
+- Invariante que o usuário não pediu.
+- Lib externa de validação sem confirmação (CONV-087).
+- Traduzir termo brasileiro (`BrazilianTaxId` para `Cpf`) (CONV-063).
 - `float`/`double` para dinheiro. Atributos `[Key]`/`[Column]` ou referência a `DbContext`.
-- `class` sem `IEquatable` (igualdade por referência) para algo que é valor.
+- Namespace copiado dos exemplos ou placeholder `{RootNamespace}` deixado literal.
 
 ## Checklist + Harness
 
 Checklist (mapeado a CONV):
-- [ ] `sealed record` (`partial` só se usar source-gen), um tipo por arquivo, file-scoped namespace (CONV-064/012/011/013).
+- [ ] Arquivo em `{DomainProjectDir}/ValueObjects/{Name}.cs`; namespace `{RootNamespace}.ValueObjects` com RootNamespace resolvido do `.csproj` (CONV-013).
+- [ ] `sealed record` (`partial` só se usar source-gen), um tipo por arquivo, file-scoped namespace (CONV-025/064/068/012/011).
 - [ ] Construtor `private`; construção só via `Create` (CONV-025/065).
-- [ ] Cada invariante tem `static Error {Name}.{Reason}` e uma guard clause com `FromInvalid` (CONV-021/069).
-- [ ] `Create` retorna `Result<{Name}>` (`WithSuccess` no caminho feliz, após normalizar).
+- [ ] Cada invariante tem `private static readonly Error` com `Code` `{Name}.{Reason}` e guard clause **com chaves** retornando `FromInvalid` (CONV-021/085/065).
+- [ ] Só as invariantes pedidas (+ guard de tamanho quando houver regex).
+- [ ] `Create` retorna `Result<{Name}>`; `WithSuccess(value)` no caminho feliz, após normalizar (CONV-085).
 - [ ] Sem `null` para erro, sem `throw` para regra, sem `!` null-forgiving (CONV-069/003).
-- [ ] Formato por `[GeneratedRegex]` (BCL); nenhuma lib nova sem confirmação.
-- [ ] Dinheiro é `decimal` (CONV-059). Identificadores em inglês (CONV-063). Zero EF/ORM/I/O (CONV-006/024).
-- [ ] RootNamespace resolvido do repo, não placeholder.
+- [ ] Regex (se houver): `[GeneratedRegex]` com `matchTimeoutMilliseconds`, tamanho verificado antes, `\A…\z`, sem quantificador aninhado (CONV-086).
+- [ ] PII: `ToString` sobrescrito com máscara (CONV-054).
+- [ ] `using` da lib só se não houver global using; `const`/`static readonly` em PascalCase (CONV-015).
+- [ ] Dinheiro é `decimal` (CONV-059). Identificadores em inglês, exceto `Cpf`/`Cnpj`/`Cep` (CONV-063). Zero EF/ORM/I/O (CONV-006/024). Nenhum pacote novo (CONV-087).
 
-Harness (gate — só conclui quando passa):
-- `dotnet build` do `Domain` compila sem warning (CONV-002 trata warning como erro).
-- Analyzers / `.editorconfig` / `BannedSymbols.txt` sem violação (§16).
-- Se algum teste já referencia o tipo, ele está verde.
+Harness (gate — só conclui quando os dois passam):
+1. `dotnet build <Domain.csproj>` sem warnings. Com CONV-002 isso cobre analyzers, `.editorconfig` (`IDE*`, inclusive `IDE0011` e `IDE0005`) e `BannedSymbols.txt`.
+2. `dotnet format <Domain.csproj> --verify-no-changes` sem diferenças: pega whitespace, espaço no fim de linha e quebras de linha.
+
+Se algum teste já referencia o tipo, ele também precisa estar verde.
