@@ -1,147 +1,109 @@
 ---
 name: create-endpoint
-description: 'Cria um endpoint Minimal API (.NET/C#, camada Api) que recebe a request, chama o use case e mapeia Result para HTTP com ProblemDetails. Use sempre que o usuário pedir um endpoint, rota, route, HTTP GET/POST, ou expor um use case via API. Não use para controllers MVC nem para regra de negócio (que fica no use case).'
+description: 'Cria o endpoint HTTP (Minimal API, camada Api) de um use case de leitura já existente — GetById ou GetPaged: classe do endpoint, RouteMappings da feature, registro no Program.cs e, na listagem, os modelos REST, o mapper e a validação. Traduz Result em HTTP via ResultTranslator. Use sempre que o usuário pedir um endpoint, rota, GET, API ou expor um use case por HTTP (ex. GET /profiles/{id}, listar profiles), mesmo sem usar o termo. Não use para criar o use case (create-read-use-case) nem para endpoints de escrita (POST/PUT/PATCH/DELETE), ainda sem skill.'
 ---
 
-# Criar Endpoint (.NET / Minimal API)
+# Criar Endpoint de Leitura (.NET / Minimal API)
 
-Gera um endpoint fino que adapta HTTP para o use case conforme a `dotnet-conventions`.
-Esta skill é a fábrica; a rule é o contrato. Cite os CONV pelo ID.
+Gera o endpoint HTTP de um use case de leitura conforme a `dotnet-conventions.md` na raiz do
+projeto. Esta skill é a fábrica; a rule é o contrato. Cite os CONV pelo ID. Aqui ficam as regras
+**comuns**; o que é específico de cada endpoint está nos resources.
+
+## Resources (leia o do padrão escolhido, inteiro, antes de escrever)
+| Pedido / use case | Resource |
+|---|---|
+| Sempre, antes de qualquer padrão: `ResultTranslator`, helpers exigidos, `RouteMappings` e `Program.cs` | `prerequisites.md` |
+| Use case `GetById{Aggregate}` | `get-by-id.md` |
+| Use case `GetPaged{AggregateFolder}` | `get-paged.md` |
+
+Outro use case (escrita, cursor, outra leitura): **não há padrão** — pare e pergunte, não improvise.
+Template canônico, exemplos ❌/✅, anti-patterns e checklist **específicos** ficam no resource.
 
 ## O que gera
-Adiciona/edita `src/Api/Features/{Aggregate}/{Aggregate}Endpoints.cs` — um método de extensão
-`Map{Aggregate}Endpoints` com `MapGroup` e o handler da rota, chamando o use case.
+Em `{ApiProjectDir}/Endpoints/{AggregateFolder}/v1/`: `{Operation}Endpoint.cs` (uma classe por endpoint) e,
+na listagem, `Models/{Operation}RestRequest.cs`, `Models/{Operation}RestResponse.cs` e
+`Models/{Operation}RestMapper.cs`. Além disso: uma linha na cadeia do `RouteMappings` da feature e, se ainda
+não estiver, `app.Add{AggregateFolder}Endpoints();` no `Program.cs` (ver `prerequisites.md`). Nunca sobrescreva arquivo existente.
 
 ## Escopo (quando usar / NÃO usar)
-- **Usar:** expor um use case por HTTP (Minimal API).
-- **NÃO usar:** controller MVC; qualquer regra de negócio (fica no use case); validação de forma (é filtro/validator).
+- **Usar:** expor por HTTP um use case de **leitura** que já existe na Application.
+- **NÃO usar:** criar o use case → `create-read-use-case`. Escrita (POST/PUT/PATCH/DELETE) → sem skill ainda.
+
+## Vocabulário (placeholders usados em toda a skill e nos resources)
+- `{Operation}` nome da operação **já existente** na Application (`GetByIdAccount`, `GetPagedAccounts`) — leia da pasta `Features/{AggregateFolder}/{Operation}/`, não invente.
+- `{Aggregate}` tipo singular (`Account`); `{AggregateFolder}` pasta plural (`Accounts`); `{resource}` segmento de rota: `{AggregateFolder}` em kebab-case minúsculo (`accounts`, `bank-accounts`).
+- `{ApiProjectDir}` pasta do `.csproj` da Api.
+- `{ApiRootNamespace}` e `{ApplicationRootNamespace}` resolvidos dos `.csproj`. São placeholders: nunca copie o valor de um exemplo.
 
 ## Contrato
 
-### Rules enforçadas (CONV)
-- **CONV-035** Minimal API, endpoints agrupados por feature com `MapGroup`. **CONV-073** versionamento no grupo.
-- **CONV-036** typed results (`Results<Ok<T>, ProblemHttpResult>`); sem `IResult` não tipado.
-- **CONV-037** reusa `Request`/`Response` da Application. **CONV-070** nunca expõe entidade.
-- **CONV-039** falha roteada pelo `ResultToProblemDetails` compartilhado. **CONV-040** endpoint fino, sem regra.
-- **CONV-038** validação de forma via endpoint filter (registrado à parte). **CONV-061** exceções ficam com o middleware global (sem try/catch no endpoint).
-- **CONV-044** `cancellationToken` do framework propagado. **CONV-072** transporte só aqui.
+### Rules enforçadas (CONV) — comuns a todos os padrões
+- **CONV-035/073** Minimal API; um grupo por feature criado por `RouteGroupBuilderFactory.Factory(app, Resource, Version)`; versão explícita (`Version`, namespace `v1`).
+- **CONV-040** endpoint fino: monta o Request, chama o use case, traduz o `Result`. Sem regra de negócio, sem repositório/`DbContext`, sem `try/catch` (exceção não tratada é do `IExceptionHandler` global, CONV-061).
+- **CONV-039/022** `ResultTranslator.ToIResult()` é o único tradutor de `Result` → HTTP; nunca serializar `Result`/`Error` direto, nunca montar `Results.NotFound()` à mão.
+- **CONV-079** toda rota com `.RequireAuthorization(AuthorizationPolicies.{AggregateFolder}Read)`. Posse do recurso é do use case (CONV-056).
+- **CONV-044/074** `CancellationToken cancellationToken` é o último parâmetro do handler, sem default, repassado ao use case.
+- **CONV-070/057** nunca expor entidade; resposta de erro sem detalhe interno.
+- **CONV-011/012/013** file-scoped namespace, um tipo por arquivo, namespace espelha a pasta (`{ApiRootNamespace}.Endpoints.{AggregateFolder}.v1`). `using` explícito para os namespaces de `RouteNames`, `AuthorizationPolicies`, `AddDefaultResponseEndpoints` e do use case.
+- **CONV-087** nenhum pacote novo sem confirmação.
+
+### Decisões de design fixadas (documentadas para revisão)
+1. **Retorno `IResult`** via `ToIResult()`, não typed results: o status HTTP nasce do `ResultType` (o `ResultTranslator` decide).
+2. **Modelo de falha = `ResultType` da lib** (404 vem de `Result.NotFound`); não há taxonomia `AppError`.
+3. **GetById devolve o response da Application; GetPaged usa `RestRequest`/`RestResponse` + Mapster** (o `[AsParameters]` não vincula o `PagedRequest`).
+4. **Validação do paginado é inline** (`IValidator<{Operation}Request>` sobre o Request já mapeado, antes do use case): um filtro de endpoint validaria o `RestRequest`, tipo que o Validator não conhece.
+5. **Um endpoint = uma classe** `{Operation}Endpoint` com um método de extensão `Add{GetById|GetPaged}`.
 
 ### Pré-condições
-Existem o `{Operation}UseCase`, o `{Operation}Request`/`Response`, e o mapeador compartilhado
-`ResultToProblemDetails` (bootstrap da Api). O use case é registrado por `register-dependencies`.
+Use case, interface, Request e Response existem na Application (`create-read-use-case`; se faltar, gere antes). Os helpers da Api listados em `prerequisites.md` existem. O registro no DI (use cases, `IValidator<>`, `IMapper` e os `IRegister` da Api, explícito, sem scanning — CONV-042) é de `register-dependencies`, que ainda não existe: **sem ele o endpoint falha em runtime** — avise ao terminar.
 
 ### Inputs
-1. **Operation/Aggregate** — o use case a expor.
-2. **Verbo e rota** — método HTTP e path (ex.: `GET /v1/accounts/{id}`).
-3. **Ligação request** — como montar o `Request` a partir de rota/query/body (+ contexto como `userId` do token, se houver).
-4. **RootNamespace** — resolvido por ReAct.
+1. **Use case alvo** — `{Operation}` (deduzido do pedido; confirme na Application). 2. **Aggregate / AggregateFolder.**
+3. **Paginado:** filtros e campos ordenáveis vêm do `Request` da Application (não reinvente).
+4. **RootNamespaces** — resolvidos por ReAct, não perguntados de cara.
 
 ## Fluxo (ReAct)
-1. **Resolver RootNamespace**.
-2. **Conferir** o `{Aggregate}Endpoints.cs`: existe? Então **adicione a rota** ao grupo, não recrie o arquivo.
-3. **Confirmar** a assinatura do use case (Request/Response) para tipar o resultado.
-4. **Escrever/estender** o grupo e o handler (CoT).
-5. **Verificar** pelo Checklist + Harness.
+1. **Localizar os `.csproj` da Api e da Application.**
+2. **Resolver `{ApiRootNamespace}` e `{ApplicationRootNamespace}`.** Nunca use o namespace dos exemplos.
+   - Preferencial: `dotnet msbuild <csproj> -getProperty:RootNamespace`. Fallback: `<RootNamespace>`; senão `<AssemblyName>`; senão o nome do `.csproj` sem extensão.
+   - Namespace do endpoint = `{ApiRootNamespace}.Endpoints.{AggregateFolder}.v1`; do use case = `{ApplicationRootNamespace}.Features.{AggregateFolder}.{Operation}` (`using` explícito).
+3. **Checar usings globais** da Api (`Microsoft.AspNetCore.Mvc`, `MapsterMapper`, `FluentValidation`, a lib `Result`): se já são `global using`, não repita (`IDE0005`).
+4. **Executar `prerequisites.md`** (verifica; cria só o que falta; para se faltar helper).
+5. **Conferir o use case** na Application (`I{Operation}UseCase`, `{Operation}Request`, `{Operation}Response`). Faltando → `create-read-use-case` antes.
+6. **Escolher o padrão** na tabela e ler o resource inteiro.
+7. **Checar duplicidade:** `{Operation}Endpoint.cs` já existe, ou o método já está na cadeia do `RouteMappings`? Não sobrescreva nem duplique: relate.
+8. **Escrever** o endpoint (+ modelos REST no paginado) pelo template; **acrescentar** `.Add{...}()` à cadeia do `RouteMappings`; garantir a chamada no `Program.cs`.
+9. **Verificar** pelo Checklist + Harness.
 
-## Raciocínio antes de escrever (CoT)
-- O endpoint só **traduz**: parse → `Request` → `useCase.HandleAsync` → mapeia `Result`. Nada além.
-- Qual o **typed result**? Sucesso `Ok<Response>`; falha `ProblemHttpResult` via mapeador compartilhado.
-- O `Request` precisa de dado fora do corpo (ex.: `userId`)? Monte-o aqui; o use case segue agnóstico (CONV-072).
-- Há `try/catch`? Não — exceção é do middleware global (CONV-061).
-- Expus alguma entidade? Só `Response` sai (CONV-037/070).
+## Raciocínio antes de escrever (CoT) — comum
+- O endpoint só adapta protocolo? Se apareceu regra de negócio, consulta a repositório ou `try/catch`, está no lugar errado (CONV-040).
+- Todo status HTTP vem do `ResultTranslator`? Qualquer `Results.NotFound()/BadRequest()` manual para falha de use case está errado.
+- O tipo do Request/Response é o do use case existente? Nunca recriar contrato.
+- Rota, versão, policy e nome de rota vêm de constantes existentes (`Resource`, `Version`, `AuthorizationPolicies`, `RouteNames`), nunca de string solta.
 
-## Template canônico
-```csharp
-namespace {RootNamespace}.Api.Features.{Aggregate};
-
-public static class {Aggregate}Endpoints
-{
-    public static IEndpointRouteBuilder Map{Aggregate}Endpoints(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/v1/{aggregate}s").WithTags("{Aggregate}s");
-
-        group.MapGet("/{id:guid}", {Operation})
-            .WithName(nameof({Operation}));
-
-        return app;
-    }
-
-    private static async Task<Results<Ok<{Operation}Response>, ProblemHttpResult>> {Operation}(
-        Guid id,
-        {Operation}UseCase useCase,
-        CancellationToken cancellationToken)
-    {
-        var result = await useCase.HandleAsync(new {Operation}Request(id), cancellationToken);
-
-        return result.IsSuccess
-            ? TypedResults.Ok(result.Value)
-            : result.Errors.ToProblem();   // ResultToProblemDetails compartilhado (CONV-039)
-    }
-}
-```
-
-## Exemplos (few-shot ❌/✅)
-
-❌ Sem contexto — controller MVC, expõe entidade, sem CT, infra e exceção no endpoint:
-```csharp
-[ApiController, Route("accounts")]                        // MVC controller (CONV-035)
-public class AccountsController(AppDbContext db) : ControllerBase
-{
-    [HttpGet("{id}")]
-    public async Task<Account> Get(Guid id)               // expõe entidade, sem CT (CONV-037/070/044)
-        => await db.Accounts.FindAsync(id)                // infra/regra no endpoint (CONV-040)
-           ?? throw new KeyNotFoundException();            // exceção manual (CONV-061)
-}
-```
-✅ Com contexto — Minimal API fino, typed results, mapeador compartilhado:
-```csharp
-namespace Bank.Api.Features.Accounts;
-
-public static class AccountsEndpoints
-{
-    public static IEndpointRouteBuilder MapAccountsEndpoints(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/v1/accounts").WithTags("Accounts");
-
-        group.MapGet("/{id:guid}", GetAccountById)
-            .WithName(nameof(GetAccountById));
-
-        return app;
-    }
-
-    private static async Task<Results<Ok<GetAccountByIdResponse>, ProblemHttpResult>> GetAccountById(
-        Guid id,
-        GetAccountByIdUseCase useCase,
-        CancellationToken cancellationToken)
-    {
-        var result = await useCase.HandleAsync(new GetAccountByIdRequest(id), cancellationToken);
-
-        return result.IsSuccess
-            ? TypedResults.Ok(result.Value)
-            : result.Errors.ToProblem();
-    }
-}
-```
-Diferença: Minimal API com `MapGroup` versionado (CONV-035/073); typed results (CONV-036);
-retorna `Response`, não `Account` (CONV-037/070); chama o use case, sem infra/regra (CONV-040);
-falha pelo mapeador compartilhado (CONV-039); exceção fica com o middleware (CONV-061).
-
-## Anti-patterns (recusar)
-- Controller MVC / `[ApiController]` / `IActionResult`.
-- Retornar/expor entidade de domínio.
-- `try/catch` no endpoint; construir `ProblemDetails` inline em vez do mapeador compartilhado.
-- Regra de negócio, acesso a repositório/`DbContext` no endpoint.
-- Rota solta sem `MapGroup`/versão; `CancellationToken` ausente.
+## Anti-patterns comuns (recusar)
+- Regra de negócio, `DbContext`, repositório ou `try/catch` no endpoint; endpoint que chama outro endpoint.
+- Traduzir `Result` à mão (`if (output.IsFailure) return Results.NotFound()`), serializar `Result`/`Error`, ou expor entidade.
+- Rota sem `RequireAuthorization`, policy como string literal, versão ou `Resource` hard-coded fora do `RouteMappings`.
+- Copiar nomes de exemplo (`GetShortUrlById`, `Profiles`) ou o namespace de um exemplo.
+- Criar de novo `ResultTranslator`/`RouteMappings` que já existem, ou inventar helper ausente (`RouteGroupBuilderFactory`, `AuthorizationPolicies`, `LocationBuilder`...): pare e reporte.
+- Registrar o mesmo endpoint duas vezes na cadeia, ou duplicar `app.Add{AggregateFolder}Endpoints()` no `Program.cs`.
+- `CancellationToken` com default ou não repassado; omitir os `using` explícitos.
 
 ## Checklist + Harness
-Checklist (CONV):
-- [ ] Minimal API, `MapGroup` com prefixo de versão, agrupado por feature (CONV-035/073).
-- [ ] Typed results `Results<Ok<Response>, ProblemHttpResult>` (CONV-036).
-- [ ] Só `Request`/`Response` no contrato; nenhuma entidade exposta (CONV-037/070).
-- [ ] Endpoint fino: parse → use case → `ToProblem` compartilhado; sem regra, sem `try/catch` (CONV-040/039/061).
-- [ ] `cancellationToken` propagado (CONV-044). RootNamespace do repo.
+Checklist (comum; o resource acrescenta os itens do padrão):
+- [ ] `prerequisites.md` executado e resource do padrão lido; nada duplicado.
+- [ ] Arquivos em `Endpoints/{AggregateFolder}/v1/`, namespace com o `RootNamespace` da Api, um tipo por arquivo (CONV-012/013).
+- [ ] Endpoint fino: só Request → use case → `ToIResult()` (CONV-040/039); sem `try/catch`.
+- [ ] `RequireAuthorization(AuthorizationPolicies.{AggregateFolder}Read)` presente e a constante existe (CONV-079).
+- [ ] `CancellationToken cancellationToken` último, sem default, repassado (CONV-044/074).
+- [ ] Método na cadeia do `RouteMappings`; `Program.cs` chama `app.Add{AggregateFolder}Endpoints()` uma única vez.
+- [ ] Nenhum helper recriado; nenhum pacote novo (CONV-087).
 
-Harness (gate):
-- `dotnet build` da `Api` limpo (CONV-002).
-- App sobe; a rota aparece no OpenAPI (CONV-073).
-- (Quando houver) teste de integração do endpoint verde.
+Harness (gate — só conclui quando todos passam):
+1. `dotnet build <Api.csproj>` sem warnings. Com CONV-002 cobre analyzers, `.editorconfig` (`IDE*`, inclusive `IDE0005`) e `BannedSymbols.txt`.
+2. `dotnet format <Api.csproj> --verify-no-changes` sem diferenças.
+3. Testes conforme os cenários do resource (integração com `WebApplicationFactory` e o use case substituído por mock; mapper REST com `Compile()`). Se o projeto de testes da Api não existe, **não o crie** (pacote novo, CONV-087): reporte Harness parcial (build + format) e pare.
+4. Grep na Api por `DbContext`, `IRepository`, `catch (` e `Results.NotFound(` / `Results.BadRequest(` em endpoints — deve dar vazio.
+
+Se qualquer comando falhar por erro de ambiente/ferramenta (timeout, processo que não inicia, etc.) em vez de reprovar por conteúdo do arquivo, **não trate como passo concluído**: tente novamente uma vez e, se persistir, reporte como Harness incompleto e pare — não declare o endpoint concluído.
