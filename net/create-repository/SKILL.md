@@ -1,129 +1,134 @@
 ---
 name: create-repository
-description: 'Cria o repositório de um agregado (.NET/C#, Clean Architecture) — a porta na camada Application e a implementação na Infrastructure via JacksonVeroneze.NET.EntityFramework (IEfCoreRepository). Use sempre que o usuário pedir um repository, repositório, porta de persistência ou acesso a dados de um agregado (ex. AccountRepository, OrderRepository), mesmo sem usar o termo. Não use para regra de negócio (Domain) nem para orquestração de caso de uso (create-read-use-case).'
+description: 'Cria o repositório de um agregado (.NET/C#, Clean Architecture) — a porta na camada Application e a implementação na Infrastructure via JacksonVeroneze.NET.EntityFramework (IEfCoreRepository). Use sempre que o usuário pedir um repository, repositório, porta de persistência ou acesso a dados de um agregado (ex. AccountRepository, OrderRepository), mesmo sem usar o termo. Não use para regra de negócio (Domain) nem para orquestração de caso de uso.'
 ---
 
 # Criar Repository (.NET / Clean Architecture)
 
-Gera o par **porta + implementação** de um agregado conforme a `dotnet-conventions.md` na raiz
-do projeto. Esta skill é a fábrica; a rule é o contrato. Cite os CONV pelo ID.
+Gera o par **porta + implementação** de um agregado conforme a `dotnet-conventions.md` da raiz do
+projeto. Esta skill é a fábrica; as rules são o contrato — cite o CONV pelo ID sempre que
+justificar uma decisão.
 
-> ✅ **Verificado contra o código-fonte real**, tag `1.4.0` de
-> `github.com/jacksonveroneze/JacksonVeroneze.NET.EntityFramework` (a mesma versão publicada no
-> NuGet). O branch `main` do repo está desatualizado (ainda em `1.0.1`, com uma API antiga —
-> `IBaseRepository<TEntity, TKey>` + `IUnitOfWork.CommitAsync()`); **não use `main` como
-> referência**, use a tag da versão instalada. `IEfCoreRepository<TEntity, TDbContext>` expõe
-> `DbContext`/`DbSet` como propriedades, e `GetPagedAsync<TKey>` exige `expression` e
-> `orderExpression` — **nenhum dos dois é opcional/anulável** na interface real (diferente de
-> uma versão anterior desta skill, que presumia isso).
+Em conflito entre o Template canônico e os Exemplos abaixo, o Template vence — os exemplos são
+reforço didático, não a fonte primária.
 
 ## O que gera
-Dois arquivos, em dois projetos diferentes:
-- Porta: `{ApplicationProjectDir}/Abstractions/Repositories/{Aggregate}/I{Aggregate}Repository.cs`
-- Impl: `{InfrastructureProjectDir}/Repositories/{Aggregate}Repository.cs`
+Dois arquivos, em dois projetos diferentes. `{X}ProjectDir` é a pasta do `.csproj` daquele
+projeto, e **cada projeto tem `RootNamespace` próprio**.
 
-Cada `{X}ProjectDir` é a pasta do `.csproj` daquele projeto. **Os dois projetos têm
-`RootNamespace` próprios** — resolva os dois separadamente (Fluxo, passo 2).
+- Porta: `{ApplicationProjectDir}/Abstractions/Repositories/{AggregateFolder}/I{Aggregate}Repository.cs`, namespace `{ApplicationRootNamespace}.Abstractions.Repositories.{AggregateFolder}`.
+- Implementação: `{InfrastructureProjectDir}/Repositories/{AggregateFolder}/{Aggregate}Repository.cs`, namespace `{InfrastructureRootNamespace}.Repositories.{AggregateFolder}`.
+
+A porta e a implementação expõem sempre o catálogo completo: `GetByIdAsync`, `GetPagedAsync`,
+`CreateAsync`, `UpdateAsync` e `DeleteAsync`. Nada além disso: sem entidade, sem mapeamento de
+persistência, sem registro de DI, sem teste. Se algum desses faltar como pré-requisito, esta skill
+para (ver Pré-condições) em vez de criá-lo.
 
 ## Escopo (quando usar / NÃO usar)
-- **Usar:** dar acesso de persistência a **um agregado** (uma porta por agregado), leitura e/ou escrita conforme os use cases exigirem.
-- **NÃO usar:** regra de negócio → Domain. Orquestração → use case. Mapeamento de tabela → `create-persistence-config`.
+- **Usar:** dar acesso de persistência a **um agregado** — uma porta por agregado, com o catálogo completo.
+- **NÃO usar:** regra de negócio (é do Domain). Orquestração (é do use case). Mapeamento de tabela. Registro de DI.
 
 ## Contrato
 
-### Rules enforçadas (CONV)
-- **CONV-010** uma porta por agregado, compartilhada pelos slices; nunca uma por use case.
-- **CONV-082** a porta de repositório é exceção explícita ao veto de "abstração de implementação única" (CONV-081) — é por isso que essa skill existe.
-- **CONV-030** porta vive na Application; sem tipo concreto de infra na assinatura. `Page<{Aggregate}>` na porta é aceitável — é um DTO de paginação (`JacksonVeroneze.NET.Pagination`), não um tipo de infra.
-- **CONV-034** impl async + `CancellationToken`; retorna entidade de domínio, `Page<T>` ou `null`; nunca vaza `IQueryable`.
-- **CONV-007/008** dependência: Infra → Application; a porta não conhece a impl.
-- **CONV-032** Infra sem regra de negócio.
-- **CONV-081** sem generic repository **nem unit of work**; o método de mutação faz o `SaveChanges` (limite transacional, 1 agregado por transação) — aqui via `efRepository.DbContext.SaveChangesAsync(...)`.
-- **CONV-044/074** `cancellationToken` propagado, nomeado, sem default. **CONV-064** impl `sealed`. **CONV-063** inglês.
-- **CONV-088** método que só repassa uma única chamada async (sem processamento depois) NÃO usa `async`/`await` — retorna a `Task` direto com `return`, em corpo de bloco. Duas ou mais chamadas em sequência (ex.: `CreateAsync` + `SaveChangesAsync`) mantêm `async`/`await`.
-- **CONV-089** todo método usa corpo em bloco (chaves) — nunca `=>` (expression-bodied), nem para repasse de uma linha.
-- **CONV-090** parâmetro de lambda tem nome descritivo do papel (ex.: `filter` num predicado), nunca `x`/`y`/`i` genérico.
-- **CONV-013** namespace = `RootNamespace` do `.csproj` de **cada** projeto + pasta — não presuma um único RootNamespace para os dois arquivos.
-- **CONV-087** pacote novo só com confirmação — `JacksonVeroneze.NET.EntityFramework` (Infrastructure) e `JacksonVeroneze.NET.Pagination` (Application, porque `Page<T>` aparece na porta) **já estão confirmados** por decisão explícita do Jackson; não pergunte de novo para esses dois.
+### Rules de repositório / Infrastructure
+- **CONV-010** Porta de repositório vive na Application, escopo **por agregado** (`IAccountRepository`), compartilhada pelos slices daquele agregado — nunca uma porta por use case.
+- **CONV-030** Porta de repositório vive em `Application/Abstractions/Repositories/{AggregateFolder}/`. Application NÃO DEVE referenciar tipo concreto de infra (`DbContext`, provider). *Aqui:* `Page<{Aggregate}>` na assinatura é aceitável — é um DTO de paginação (`JacksonVeroneze.NET.Pagination`), não um tipo de infra.
+- **CONV-032** Infrastructure contém só: repositório, configuração de persistência, integração externa. Zero regra de negócio.
+- **CONV-034** Repositório implementa a porta; async + `CancellationToken`; retorna entidade, `Page<T>` ou `null`. NÃO DEVE vazar tipo de query do store (`IQueryable`). *Aqui:* `null` significa ausência, não erro de negócio (ver Nota).
+- **CONV-007/008 (trecho de dependência)** `Infrastructure` referencia `Application` (+ `Domain`). Camada de baixo NÃO DEVE referenciar camada de cima: a porta não conhece a implementação e a Application não referencia a Infrastructure.
+- **CONV-082** A porta de repositório é exceção explícita ao veto de "abstração de implementação única" do CONV-081, justificada por DIP + seam de teste.
+- **Local desta skill (catálogo completo):** a porta e a implementação sempre trazem as cinco operações do catálogo, mesmo que nenhum use case as use ainda. É decisão de projeto declarada aqui, não especulação.
+- **Local desta skill (`IEfCoreRepository`):** a implementação injeta `IEfCoreRepository<{Aggregate}, {DbContextType}>`, nunca o `DbContext` direto. O `DbContext` só é acessado por `efRepository.DbContext`.
+- **Local desta skill (limite transacional):** o método de mutação faz o `SaveChangesAsync` dentro dele mesmo, via `efRepository.DbContext.SaveChangesAsync(cancellationToken)`. Um agregado por transação, sem unit of work.
+- **Local desta skill (formatação):** cada parâmetro de método, da interface, da implementação e do construtor primário (mesmo com um só parâmetro), fica em sua própria linha, indentado.
+
+### Rules gerais (dotnet-conventions.md)
+- **CONV-081** sem generic repository nem unit of work.
+- **CONV-044** `CancellationToken` propagado a toda operação que o aceita. **CONV-074** parâmetro chamado `cancellationToken`, sem valor default.
+- **CONV-064** implementação `sealed`. **CONV-066** primary constructor para a injeção. **CONV-063** identificadores em inglês.
+- **CONV-069** sem `null` para erro de negócio (ver Nota).
+- **CONV-088** `await` só quando o resultado é usado no próprio método ou há mais de uma chamada em sequência. Método que só repassa uma única chamada async retorna a `Task` direto, sem `async`/`await`.
+- **CONV-089** todo método usa corpo em bloco (chaves); nunca `=>`, nem para repasse de uma linha.
+- **CONV-090** parâmetro de lambda com nome descritivo do papel (ex.: `filter`, `entity`), nunca `x`/`y`/`i`.
+- **CONV-011/012/013** file-scoped namespace, um tipo por arquivo, namespace espelha o caminho da pasta — com o `RootNamespace` do `.csproj` de **cada** projeto, sem presumir que os dois são iguais.
+- **CONV-087** pacote novo só com confirmação. `JacksonVeroneze.NET.EntityFramework` (Infrastructure) e `JacksonVeroneze.NET.Pagination` (Application, porque `Page<T>` aparece na porta) já estão confirmados; não pergunte de novo para esses dois.
 
 **Nota — por que não usa `Result`:** repositório não representa falha de negócio (CONV-034); ele
 devolve a entidade, `Page<T>` ou `null`. "Não encontrado" como falha de negócio é modelado no use
 case (`Result<T>.FromNotFound`), não aqui. Não envolva o retorno da porta em `Result`.
 
+### Referência da API (JacksonVeroneze.NET.EntityFramework)
+- A referência é o código-fonte do pacote na **tag da versão instalada**.
+- `IEfCoreRepository<TEntity, TDbContext>` expõe `DbContext` e `DbSet` como propriedades (`efRepository.DbContext`, `efRepository.DbSet`) e resolve o `DbSet` a partir de `TEntity`.
+- `GetPagedAsync<TKey>(pagination, expression, orderExpression, cancellationToken)`: `expression` e `orderExpression` são **obrigatórios e não anuláveis**; não existe overload sem eles.
+- `Update(...)` e `Delete(...)` são síncronos. `SoftDelete(...)` só chama `Update` por baixo: não marca campo nenhum como excluído nem filtra as próximas queries.
+- A interface também expõe `AnyAsync`, `CountAsync`, `GetAllAsync`, `GetSingleOrDefaultAsync` e `GetPagedCursorAsync` (cursor, não offset). Estão fora do catálogo: não gere wrapper para eles.
+
 ### Pré-condições
-A entidade do agregado existe no Domain (se faltar, gere com `create-entity` antes). **EF Core
-já é a store decidida do projeto**, mas a impl **não injeta o `DbContext` diretamente** — injeta
-`IEfCoreRepository<{Aggregate}, {DbContextType}>` (de `JacksonVeroneze.NET.EntityFramework`,
-confirmado na tag `1.4.0` — não use o branch `main`, está desatualizado), que abstrai o
-`DbSet`/`DbContext` mas também os expõe como propriedades (`efRepository.DbContext`,
-`efRepository.DbSet`) quando precisar. **Não presuma o nome `AppDbContext`**; resolva o nome real
-da classe no repo (Fluxo, passo 5) — ele só é usado como argumento genérico, nunca injetado
-sozinho. `Application` referencia `JacksonVeroneze.NET.Pagination` (para `Page<T>`/
-`PaginationParameters` na porta); `Infrastructure` referencia `JacksonVeroneze.NET.EntityFramework`.
-Além dos métodos do catálogo abaixo, a interface também expõe `AnyAsync`, `CountAsync`,
-`GetAllAsync`, `GetSingleOrDefaultAsync` e `GetPagedCursorAsync` (paginação por cursor, não por
-offset) — não gere wrappers para eles a menos que um use case peça (CONV-081); esta nota existe
-só para você saber que estão disponíveis quando precisar. O registro no DI (incluindo como o
-`IEfCoreRepository<,>` é registrado) é feito por `register-dependencies`, não aqui — essa skill
-ainda não existe.
+A entidade do agregado existe em `{DomainProjectDir}/{AggregateFolder}/{Aggregate}.cs`. A Application
+referencia o Domain e o pacote `JacksonVeroneze.NET.Pagination`. A Infrastructure referencia a
+Application e o pacote `JacksonVeroneze.NET.EntityFramework`. Existe no repo uma classe `DbContext`
+real — **não presuma o nome `AppDbContext`**; ele só é usado como argumento genérico, nunca
+injetado sozinho. Esta skill não cria entidade, `DbContext`, mapeamento de persistência, registro
+de DI, nem qualquer outro artefato fora dos dois arquivos descritos em "O que gera": se um
+pré-requisito estiver ausente, ela para e relata o que falta e onde era esperado — sem apontar como
+resolver.
 
 ### Inputs
-1. **Aggregate** — nome do agregado (`Account`) e sua pasta (`Accounts`).
-2. **Operações necessárias** — só as que os use cases atuais exigem, do catálogo: leitura (`GetByIdAsync`, `GetPagedAsync`) e/ou escrita (`CreateAsync`, `UpdateAsync`, `DeleteAsync`). Não especular CRUD (CONV-081) — o catálogo abaixo mostra como escrever cada uma corretamente quando for pedida, não uma lista para gerar por completo.
-3. **IdType** — tipo do identificador (`Guid` por padrão).
-4. **RootNamespace** de Application e de Infrastructure — resolvidos por ReAct, não perguntados de cara.
+1. **Aggregate** — nome da entidade, PascalCase, singular (`Account`, `Order`). `{aggregate}` é o mesmo nome em camelCase.
+2. **AggregateFolder** — pasta do agregado, normalmente plural (`Accounts`); é a pasta onde a entidade já está no Domain.
+3. **IdType** — tipo do `Id`, lido da entidade (`Guid` por padrão).
+
+`RootNamespace` dos dois projetos, `EntityNamespace` e `DbContextType` são resolvidos pelo Fluxo,
+não perguntados. Faltando o agregado e sem inferência segura, pergunte antes de gerar.
 
 ## Fluxo (ReAct)
-1. **Localizar os `.csproj` de Application e de Infrastructure.**
-2. **Resolver o `RootNamespace` de cada um, separadamente.** Nunca use o namespace dos exemplos desta skill, e nunca presuma que os dois projetos compartilham o mesmo RootNamespace.
-   - Preferencial: `dotnet msbuild <csproj> -getProperty:RootNamespace` para cada projeto.
-   - Fallback: `<RootNamespace>` no `.csproj`; senão `<AssemblyName>`; senão o nome do arquivo `.csproj` sem extensão.
-   - Namespace da porta = `{ApplicationRootNamespace}.Abstractions.{Aggregate}`.
-   - Namespace da impl = `{InfrastructureRootNamespace}.Persistence.Repositories`.
-3. **Checar usings globais** de cada projeto — se `JacksonVeroneze.NET.Pagination.Offset` já é `global using` na Application, ou `JacksonVeroneze.NET.EntityFramework.Interfaces` já é `global using` na Infrastructure, não repita o `using` (`IDE0005`).
-4. **Ler a entidade** no Domain para tipar o retorno e o `Id`.
-5. **Localizar o `DbContext` real do projeto.** Não presuma `AppDbContext` — encontre a classe (ex.: `find . -name "*DbContext.cs"`) e use o nome exato dela como argumento genérico de `IEfCoreRepository<{Aggregate}, {DbContextType}>`. Diferente da versão anterior desta skill, **não é mais necessário ler o `DbSet`** — a lib resolve isso internamente a partir do tipo `{Aggregate}`.
-6. **Checar porta existente** do agregado: se já existe, **adicione o método** faltante, não recrie.
-7. **Decidir** as operações mínimas — leitura e/ou escrita (CoT). Para `GetPagedAsync`, lembre que `expression` e `orderExpression` são obrigatórios na interface real (não há overload sem eles).
-8. **Escrever** porta e impl.
-9. **Verificar** pelo Checklist + Harness.
+1. **Localizar os `.csproj`** de Domain, Application e Infrastructure.
+2. **Resolver identificação.** Nunca use o namespace dos exemplos desta skill, e nunca presuma que os projetos compartilham o mesmo `RootNamespace`.
+   - `ApplicationRootNamespace` e `InfrastructureRootNamespace`, cada um do seu `.csproj`. Preferencial: `dotnet msbuild <csproj> -getProperty:RootNamespace`. Fallback: `<RootNamespace>` do `.csproj`, senão `<AssemblyName>`, senão o nome do arquivo `.csproj` sem extensão.
+   - `EntityNamespace` e `IdType`: leia o arquivo da entidade em `{DomainProjectDir}/{AggregateFolder}/{Aggregate}.cs`; o namespace é o da linha `namespace` do arquivo, o tipo é o da propriedade `Id`. Entidade ausente: pare e relate.
+   - `DbContextType`: encontre a classe real (ex.: `find . -name "*DbContext.cs"`) e use o nome exato dela. Nenhuma ou mais de uma: pare e pergunte.
+   - Declare, num bloco só, antes de escrever qualquer coisa: `Aggregate=`, `AggregateFolder=`, `IdType=`, `EntityNamespace=`, `ApplicationRootNamespace=`, `InfrastructureRootNamespace=`, `DbContextType=`, e o path final dos dois arquivos.
+3. **Checar existência.** Se a porta ou a implementação já existe, pare aqui — não sobrescreva nem adicione método; relate qual arquivo já existe.
+4. **Conferir referências.** A Application referencia o Domain e `JacksonVeroneze.NET.Pagination`; a Infrastructure referencia a Application e `JacksonVeroneze.NET.EntityFramework`. Faltando alguma, pare e relate o que falta e onde era esperado; não adicione a referência aqui.
+5. **Checar usings globais** de cada projeto. Se `EntityNamespace`, `JacksonVeroneze.NET.Pagination.Offset` ou `JacksonVeroneze.NET.EntityFramework.Interfaces` já são `global using` no projeto do arquivo, não repita o `using` (`IDE0005` é erro).
+6. **Modelar** as cinco operações (CoT abaixo).
+7. **Escrever** porta e implementação.
+8. **Verificar** pelo Checklist + Harness.
 
 ## Raciocínio antes de escrever (CoT)
-- Quais operações os use cases **hoje** precisam? Só essas entram (CONV-081).
-- O retorno é **entidade de domínio**, `Page<T>` ou `null`? Nunca DTO de persistência, nunca `IQueryable`, nunca `Result`.
-- A assinatura menciona algum tipo de EF/infra (`DbContext`, `DbSet`)? Se sim, está errada — a porta é agnóstica (CONV-030); `IEfCoreRepository<,>` e `{DbContextType}` só aparecem no construtor da **impl**, nunca na porta.
-- Um write use case precisa persistir? Use `efRepository.CreateAsync`/`Update`/`Delete` e feche com `efRepository.DbContext.SaveChangesAsync(cancellationToken)` — este é o **limite transacional**, 1 agregado por transação, sem UoW (CONV-081).
-- Precisa **excluir**? `DeleteAsync` recebe a entidade e chama `efRepository.Delete(...)` (síncrono) — é **hard delete** por padrão. A lib também tem `efRepository.SoftDelete(...)`, mas hoje ela só chama `Update` por baixo (ver nota abaixo) — não é soft delete pronto para uso. Pergunte antes de assumir hard delete numa entidade que parece precisar de exclusão lógica.
-- Precisa de **listagem paginada**? `GetPagedAsync<TKey>(pagination, expression, orderExpression, cancellationToken)` — `expression` (predicado) e `orderExpression` (ordenação) são **obrigatórios** na interface real, sem default nem `?`. Sem filtro pedido, passe `entity => true`; a ordenação default (quando nenhuma foi pedida) é `entity => entity.Id`. Se o use case precisar filtrar de verdade, a porta precisa expor os campos de filtro — não especule isso sem um use case pedindo.
-- A `IEfCoreRepository` também tem `SoftDelete(entity)`, mas na versão atual ele só chama `Update` internamente — não marca campo nenhum como excluído nem filtra automaticamente nas próximas queries. Se a entidade precisa de exclusão lógica de verdade, o estado "excluído" tem que vir de um método de comportamento na entidade (fora do escopo de `create-entity` hoje) e o filtro de leitura é configurado à parte (via `create-persistence-config`, ainda não criada) — `SoftDelete` da lib sozinho não resolve isso.
-- A impl tem alguma **decisão de negócio**? Isso é do Domain/use case, não do repositório (CONV-032).
-- O método repassa **uma única** chamada async, sem nada depois dela? Não use `async`/`await` — retorne a `Task` direto com `return`, em corpo de bloco (nunca `=>`). Só use `async`/`await` quando há duas ou mais chamadas em sequência (CONV-088/089). Note que o exemplo de referência do próprio Jackson (`ProfileRepository`) usa `async`/`await` desnecessário no `GetByIdAsync` — essa skill não repete isso; segue CONV-088.
+- A assinatura da porta menciona tipo de EF ou infra (`DbContext`, `DbSet`, `IQueryable`, `IEfCoreRepository`)? Está errada: a porta é agnóstica (CONV-030). `IEfCoreRepository<,>` e `{DbContextType}` só aparecem no construtor da **implementação**.
+- O retorno é entidade de domínio, `Page<T>` ou `null`? Nunca DTO de persistência, `IQueryable` nem `Result` (CONV-034). `null` aqui é ausência; o use case decide se vira falha.
+- Escrita: `CreateAsync` encadeia duas chamadas async (`efRepository.CreateAsync` e `SaveChangesAsync`), então mantém `async`/`await`. `UpdateAsync` e `DeleteAsync` chamam `Update`/`Delete` (síncronos) e retornam direto a `Task` do `SaveChangesAsync`, sem `async`/`await` (CONV-088). Sempre em corpo de bloco (CONV-089).
+- Exclusão: `DeleteAsync` é **hard delete** via `efRepository.Delete(...)`. `SoftDelete` da lib só chama `Update`, então não resolve exclusão lógica. Se o pedido ou a entidade indicar exclusão lógica (ex.: campo de status ou `DeletedAt`), pare e pergunte antes de gerar `DeleteAsync`.
+- Paginação: `expression` e `orderExpression` são obrigatórios. Sem filtro pedido, passe `entity => true` e ordene por `entity => entity.Id`. A porta expõe só `page` e `pageSize`; não invente parâmetros de filtro que o usuário não definiu.
+- A implementação tem alguma decisão de negócio? Não é do repositório (CONV-032) — remova.
+- O método repassa **uma única** chamada async, sem nada depois dela? Sem `async`/`await`, com `return` direto (CONV-088).
 
 ## Template canônico
-`{ApplicationRootNamespace}`/`{InfrastructureRootNamespace}` são placeholders: substitua pelos
-valores resolvidos no passo 2 do Fluxo, nunca copie literalmente.
+`{ApplicationRootNamespace}`, `{InfrastructureRootNamespace}`, `{EntityNamespace}`, `{AggregateFolder}` e
+`{DbContextType}` são placeholders: substitua pelos valores resolvidos no passo 2 do Fluxo, nunca
+copie literalmente.
 
 ```csharp
-// {ApplicationProjectDir}/Abstractions/{Aggregate}/I{Aggregate}Repository.cs
-using JacksonVeroneze.NET.Pagination.Offset;   // só se não houver global using (passo 3)
+// {ApplicationProjectDir}/Abstractions/Repositories/{AggregateFolder}/I{Aggregate}Repository.cs
+// using {EntityNamespace};                        // só se não houver global using (passo 5)
+// using JacksonVeroneze.NET.Pagination.Offset;    // só se não houver global using (passo 5)
 
-namespace {ApplicationRootNamespace}.Abstractions.{Aggregate};
+namespace {ApplicationRootNamespace}.Abstractions.Repositories.{AggregateFolder};
 
 public interface I{Aggregate}Repository
 {
-    // leitura — cada método abaixo é opt-in: só entra se um use case precisar (CONV-081)
     Task<{Aggregate}?> GetByIdAsync(
         {IdType} id,
         CancellationToken cancellationToken);
 
-    // GetPagedAsync<TKey> da lib exige filtro e ordenação; aqui a porta fica simples
-    // (sem filtro real) — expanda os parâmetros só quando um use case pedir filtro
+    // GetPagedAsync<TKey> da lib exige filtro e ordenação; a porta fica simples (sem filtro real)
     Task<Page<{Aggregate}>> GetPagedAsync(
         int page,
         int pageSize,
         CancellationToken cancellationToken);
 
-    // escrita — idem, adicionar quando um write use case precisar (não especular)
     Task CreateAsync(
         {Aggregate} {aggregate},
         CancellationToken cancellationToken);
@@ -138,16 +143,17 @@ public interface I{Aggregate}Repository
 }
 ```
 ```csharp
-// {InfrastructureProjectDir}/Persistence/Repositories/{Aggregate}Repository.cs
-using JacksonVeroneze.NET.EntityFramework.Interfaces;   // só se não houver global using (passo 3)
-using JacksonVeroneze.NET.Pagination.Offset;             // só se não houver global using (passo 3)
+// {InfrastructureProjectDir}/Repositories/{AggregateFolder}/{Aggregate}Repository.cs
+// using {EntityNamespace};                                    // só se não houver global using (passo 5)
+// using JacksonVeroneze.NET.EntityFramework.Interfaces;       // só se não houver global using (passo 5)
+// using JacksonVeroneze.NET.Pagination.Offset;                // só se não houver global using (passo 5)
 
-namespace {InfrastructureRootNamespace}.Persistence.Repositories;
+namespace {InfrastructureRootNamespace}.Repositories.{AggregateFolder};
 
 public sealed class {Aggregate}Repository(
     IEfCoreRepository<{Aggregate}, {DbContextType}> efRepository) : I{Aggregate}Repository
 {
-    // uma única chamada async, nada depois dela → sem async/await (CONV-088); sempre chaves (CONV-089)
+    // uma única chamada async, nada depois dela: sem async/await (CONV-088); sempre chaves (CONV-089)
     public Task<{Aggregate}?> GetByIdAsync(
         {IdType} id,
         CancellationToken cancellationToken)
@@ -156,8 +162,7 @@ public sealed class {Aggregate}Repository(
             filter => filter.Id == id, cancellationToken);
     }
 
-    // GetPagedAsync<TKey> da IEfCoreRepository — expression e orderExpression são obrigatórios,
-    // sem overload sem eles; sem filtro real pedido, usa predicado sempre-verdadeiro
+    // expression e orderExpression são obrigatórios na lib; sem filtro real pedido, predicado sempre-verdadeiro
     public Task<Page<{Aggregate}>> GetPagedAsync(
         int page,
         int pageSize,
@@ -172,7 +177,7 @@ public sealed class {Aggregate}Repository(
             cancellationToken);
     }
 
-    // duas chamadas async em sequência → precisa de async/await
+    // duas chamadas async em sequência: precisa de async/await
     public async Task CreateAsync(
         {Aggregate} {aggregate},
         CancellationToken cancellationToken)
@@ -180,69 +185,97 @@ public sealed class {Aggregate}Repository(
         await efRepository.CreateAsync(
             {aggregate}, cancellationToken);
 
-        await efRepository.DbContext.SaveChangesAsync(cancellationToken);   // limite transacional (CONV-081)
+        await efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);   // limite transacional
     }
 
-    // Update() é síncrono; só a Task de SaveChangesAsync é repassada → sem async/await (CONV-088)
+    // Update() é síncrono; só a Task do SaveChangesAsync é repassada: sem async/await (CONV-088)
     public Task UpdateAsync(
         {Aggregate} {aggregate},
         CancellationToken cancellationToken)
     {
         efRepository.Update({aggregate});
 
-        return efRepository.DbContext.SaveChangesAsync(cancellationToken);   // limite transacional (CONV-081)
+        return efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);   // limite transacional
     }
 
-    // Delete() é síncrono; hard delete — ver CoT para o caso de soft delete
+    // Delete() é síncrono; hard delete (ver CoT para exclusão lógica)
     public Task DeleteAsync(
         {Aggregate} {aggregate},
         CancellationToken cancellationToken)
     {
         efRepository.Delete({aggregate});
 
-        return efRepository.DbContext.SaveChangesAsync(cancellationToken);   // limite transacional (CONV-081)
+        return efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);   // limite transacional
     }
 }
 ```
 
-## Exemplos (few-shot ❌/✅)
+## Exemplos (certo/errado)
+Pedido: "repositório do agregado Account." (`Aggregate=Account`, `AggregateFolder=Accounts`,
+`IdType=Guid`.)
 
-❌ Sem contexto — generic repository, síncrono, injeta `DbContext` direto, vaza `IQueryable`, na camada errada:
+Errado — sem contexto: generic repository, síncrono, vaza `IQueryable`, porta junto da
+implementação e fora da Application, injeta `DbContext` direto:
 ```csharp
-namespace Bank.Infrastructure;                      // porta junto da impl, fora da Application
-public interface IRepository<T>                     // generic repository (CONV-081)
+namespace Bank.Infrastructure;                        // porta junto da impl, fora da Application
+public interface IRepository<T>                       // generic repository (CONV-081)
 {
-    IQueryable<T> Query();                           // vaza IQueryable (CONV-034)
+    IQueryable<T> Query();                            // vaza IQueryable (CONV-034)
     T GetById(int id);                                // síncrono, sem CancellationToken (CONV-044)
 }
 
-public class AccountRepository(AppDbContext db)      // injeta DbContext direto — não usa IEfCoreRepository
+public class AccountRepository(AppDbContext db)       // injeta DbContext direto, nome presumido
 {
 }
 ```
 
-✅ Com contexto — porta por agregado na Application, impl na Infra via `IEfCoreRepository<,>`:
+Certo — com contexto. Porta em
+`{ApplicationProjectDir}/Abstractions/Repositories/Accounts/IAccountRepository.cs`:
 ```csharp
+using {EntityNamespace};
 using JacksonVeroneze.NET.Pagination.Offset;
 
-namespace {ApplicationRootNamespace}.Abstractions.Accounts;
+namespace {ApplicationRootNamespace}.Abstractions.Repositories.Accounts;
 
 public interface IAccountRepository
 {
     Task<Account?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken);
+
+    Task<Page<Account>> GetPagedAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task CreateAsync(
+        Account account,
+        CancellationToken cancellationToken);
+
+    Task UpdateAsync(
+        Account account,
+        CancellationToken cancellationToken);
+
+    Task DeleteAsync(
+        Account account,
+        CancellationToken cancellationToken);
 }
 ```
-```csharp
-using JacksonVeroneze.NET.EntityFramework.Interfaces;
 
-namespace {InfrastructureRootNamespace}.Persistence.Repositories;
+Implementação em `{InfrastructureProjectDir}/Repositories/Accounts/AccountRepository.cs`:
+```csharp
+using {EntityNamespace};
+using JacksonVeroneze.NET.EntityFramework.Interfaces;
+using JacksonVeroneze.NET.Pagination.Offset;
+
+namespace {InfrastructureRootNamespace}.Repositories.Accounts;
 
 public sealed class AccountRepository(
     IEfCoreRepository<Account, {DbContextType}> efRepository) : IAccountRepository
 {
-    // uma única chamada async, nada depois dela → sem async/await (CONV-088); sempre chaves (CONV-089)
     public Task<Account?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken)
@@ -250,98 +283,119 @@ public sealed class AccountRepository(
         return efRepository.GetByIdAsync(
             filter => filter.Id == id, cancellationToken);
     }
+
+    public Task<Page<Account>> GetPagedAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        PaginationParameters pagination = new(page, pageSize);
+
+        return efRepository.GetPagedAsync(
+            pagination,
+            entity => true,
+            entity => entity.Id,
+            cancellationToken);
+    }
+
+    public async Task CreateAsync(
+        Account account,
+        CancellationToken cancellationToken)
+    {
+        await efRepository.CreateAsync(
+            account, cancellationToken);
+
+        await efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);
+    }
+
+    public Task UpdateAsync(
+        Account account,
+        CancellationToken cancellationToken)
+    {
+        efRepository.Update(account);
+
+        return efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);
+    }
+
+    public Task DeleteAsync(
+        Account account,
+        CancellationToken cancellationToken)
+    {
+        efRepository.Delete(account);
+
+        return efRepository.DbContext
+            .SaveChangesAsync(cancellationToken);
+    }
 }
 ```
 
-✅ Forma de escrita (sob demanda, quando um write use case precisar) — `SaveChanges` via `efRepository.DbContext`:
-```csharp
-// duas chamadas async em sequência → precisa de async/await
-public async Task CreateAsync(
-    Account account,
-    CancellationToken cancellationToken)
-{
-    await efRepository.CreateAsync(
-        account, cancellationToken);
-
-    await efRepository.DbContext.SaveChangesAsync(cancellationToken);   // limite transacional, 1 agregado, sem UoW
-}
-```
-
-✅ Forma de exclusão (hard delete — ver CoT para quando a entidade precisa de soft delete):
-```csharp
-// Delete() é síncrono; só a Task de SaveChangesAsync é repassada → sem async/await (CONV-088)
-public Task DeleteAsync(
-    Account account,
-    CancellationToken cancellationToken)
-{
-    efRepository.Delete(account);
-
-    return efRepository.DbContext.SaveChangesAsync(cancellationToken);   // limite transacional, 1 agregado, sem UoW
-}
-```
-
-Diferença: porta específica do agregado na Application, com o `RootNamespace` **daquele**
-projeto (CONV-010/030/013); retorna `Account?`/`Page<Account>`, não `IQueryable` nem `Result`
-(CONV-034); construtor primário injeta `IEfCoreRepository<Account, {DbContextType}>`, **nunca**
-o `DbContext` direto; `{DbContextType}` é o nome real da classe no repo, usado só como argumento
-genérico; async com `cancellationToken` sem default, um parâmetro por linha, inclusive no
-construtor primário com um só parâmetro (CONV-044/074); `GetByIdAsync`/`DeleteAsync`/`UpdateAsync`
-repassam uma única chamada async cada, sem `async`/`await`, mas com corpo em bloco (CONV-088/089)
-— diferente do exemplo de referência original do Jackson, que usava `async`/`await`
-desnecessário nesse ponto; lambda com nome descritivo (`filter`, não `x`/`conf`) (CONV-090);
-`CreateAsync` encadeia duas chamadas, por isso mantém `async`/`await` (CONV-088); `SaveChanges`
-sempre via `efRepository.DbContext`, nunca um `DbContext` injetado à parte; impl `sealed` na
-Infra, com o `RootNamespace` **dela**, não o da Application (CONV-064/007); persistência
-confinada ao método de mutação, que é o limite transacional (CONV-081).
+Diferença: porta específica do agregado na Application e implementação na Infrastructure, cada
+uma com o `RootNamespace` do **seu** projeto (CONV-010/030/013); retorna `Account?`/`Page<Account>`,
+não `IQueryable` nem `Result` (CONV-034); construtor primário injeta
+`IEfCoreRepository<Account, {DbContextType}>`, nunca o `DbContext` direto, e `{DbContextType}` é o
+nome real da classe no repo; async com `cancellationToken` sem default, um parâmetro por linha
+(CONV-044/074); `GetByIdAsync`, `GetPagedAsync`, `UpdateAsync` e `DeleteAsync` repassam uma única
+chamada async cada, sem `async`/`await` e com corpo em bloco (CONV-088/089); `CreateAsync` encadeia
+duas chamadas, por isso mantém `async`/`await`; lambda com nome descritivo (`filter`, `entity`),
+nunca `x` (CONV-090); `SaveChanges` sempre via `efRepository.DbContext`, dentro do método de
+mutação, que é o limite transacional; implementação `sealed` (CONV-064).
 
 ## Anti-patterns (recusar)
-- `IRepository<T>` genérico, unit of work especulativo.
-- Injetar `{DbContextType}` diretamente no construtor da impl — injete `IEfCoreRepository<{Aggregate}, {DbContextType}>`.
-- Retornar `IQueryable`/`DbSet` ou expor `.Include(...)` para fora.
+- `IRepository<T>` genérico ou unit of work (CONV-081).
+- Injetar `{DbContextType}` diretamente no construtor da implementação — injete `IEfCoreRepository<{Aggregate}, {DbContextType}>`.
+- Retornar `IQueryable`/`DbSet` ou expor `.Include(...)` para fora (CONV-034).
 - Envolver o retorno da porta em `Result`/`Result<T>` — repositório não representa falha de negócio.
-- Método síncrono ou `CancellationToken cancellationToken = default`.
-- Porta na Infra, ou tipo de infra (`DbContext`/`IEfCoreRepository`) na assinatura da porta — só `Page<T>` é aceitável, por ser DTO de paginação.
-- `SaveChanges` fora do método de mutação, ou chamado num `DbContext` injetado à parte em vez de `efRepository.DbContext` (no use case, ou num UoW genérico).
-- Especular `CreateAsync`/`UpdateAsync`/`DeleteAsync`/`GetPagedAsync` que nenhum use case usa ainda.
-- Qualquer regra de negócio dentro do repositório.
+- Método síncrono, ou `CancellationToken cancellationToken = default` (CONV-044/074).
+- Porta na Infrastructure, ou tipo de infra (`DbContext`, `IEfCoreRepository`) na assinatura da porta — só `Page<T>` é aceitável, por ser DTO de paginação (CONV-030).
+- `SaveChangesAsync` fora do método de mutação, ou chamado num `DbContext` injetado à parte em vez de `efRepository.DbContext`.
+- Omitir uma operação do catálogo, ou gerar wrapper para método da lib fora do catálogo (`AnyAsync`, `CountAsync`, `GetAllAsync`, `GetSingleOrDefaultAsync`, `GetPagedCursorAsync`).
+- Qualquer regra de negócio dentro do repositório (CONV-032).
 - Presumir o nome `AppDbContext` sem checar a classe real do projeto.
-- Usar o mesmo `RootNamespace` para porta e impl, ou copiar o namespace do exemplo.
-- `async`/`await` num método que só repassa uma única chamada async sem processamento depois — retorne a `Task` direto (CONV-088). Não copie o `async`/`await` desnecessário do exemplo de referência original.
-- Membro expression-bodied (`=>`) em método, mesmo de uma linha só — sempre corpo em bloco com chaves (CONV-089).
-- Parâmetro de lambda genérico (`x`, `y`, `i`, `conf`) em vez de um nome que descreva o papel (`filter`, `item`) (CONV-090).
-- Parâmetros do método (ou do construtor primário, mesmo com um só parâmetro) na mesma linha da assinatura — cada parâmetro em sua própria linha, indentado.
-- `DeleteAsync` fazendo `Delete` direto numa entidade que precisa de soft delete — sem o método de comportamento na entidade (fora do escopo de `create-entity` hoje), pare e pergunte em vez de assumir hard delete.
-- Gerar `GetPagedAsync` sem os parâmetros `expression`/`orderExpression` (são obrigatórios na `IEfCoreRepository`, não há overload sem eles) — ou nomeá-los diferente do que a interface usa.
-- Nome de pacote errado (`JacksonVeroneze.NET.EF`, `...EFCore`) — o pacote real é `JacksonVeroneze.NET.EntityFramework`.
+- Usar o mesmo `RootNamespace` para porta e implementação, copiar o namespace do exemplo, ou deixar placeholder (`{ApplicationRootNamespace}`, `{EntityNamespace}`...) literal.
+- `async`/`await` num método que só repassa uma única chamada async sem processamento depois (CONV-088).
+- Membro expression-bodied (`=>`) em método, mesmo de uma linha só (CONV-089).
+- Parâmetro de lambda genérico (`x`, `y`, `i`) em vez de um nome que descreva o papel (CONV-090).
+- Parâmetros do método (ou do construtor primário, mesmo com um só) na mesma linha da assinatura — cada um em sua própria linha, indentado.
+- `DeleteAsync` com hard delete numa entidade que indica exclusão lógica sem confirmar com o usuário; tratar `efRepository.SoftDelete` como exclusão lógica pronta.
+- `GetPagedAsync` sem `expression`/`orderExpression` (são obrigatórios; não há overload sem eles), ou com esses parâmetros nomeados diferente da interface da lib.
+- Nome de pacote errado (`JacksonVeroneze.NET.EF`, `...EFCore`) — o pacote real é `JacksonVeroneze.NET.EntityFramework`. Pacote novo sem confirmação (CONV-087).
+- Sobrescrever arquivo existente, ou adicionar método a uma porta que já existe.
+- Criar a entidade, o `DbContext`, o mapeamento ou qualquer outro artefato fora do escopo, em vez de parar e relatar.
 
 ## Checklist + Harness
-Checklist (CONV):
-- [ ] Porta em `{ApplicationProjectDir}/Abstractions/{Aggregate}/`, namespace com o `RootNamespace` da **Application** (CONV-010/030/013).
-- [ ] Impl `sealed` em `{InfrastructureProjectDir}/Persistence/Repositories/`, namespace com o `RootNamespace` da **Infrastructure**, implementa a porta (CONV-064/034/013).
-- [ ] Construtor primário injeta `IEfCoreRepository<{Aggregate}, {DbContextType}>`, nunca o `DbContext` direto.
-- [ ] `using JacksonVeroneze.NET.EntityFramework.Interfaces` (impl) e `using JacksonVeroneze.NET.Pagination.Offset` (porta e impl, se `GetPagedAsync` existir) presentes ou global using confirmado.
-- [ ] Nome da classe `DbContext` real confirmado no repo, usado só como argumento genérico — nunca presumido como `AppDbContext`, nunca injetado sozinho.
-- [ ] Async + `cancellationToken` nomeado sem default; retorna entidade, `Page<T>` ou `null`, nunca `Result` (CONV-044/074/034).
-- [ ] Sem `IQueryable`/`DbContext` na porta; só `Page<T>` como exceção; só operações usadas hoje (CONV-030/081).
-- [ ] Método de mutação (se houver) faz `SaveChanges` via `efRepository.DbContext`, dentro do próprio método; sem UoW (CONV-081).
-- [ ] Cada parâmetro em sua própria linha, indentado (interface, impl e construtor primário, mesmo com um só parâmetro).
-- [ ] Todo método com corpo em bloco (chaves); nenhum `=>` em método (CONV-089).
+
+Checklist (mapeado a CONV):
+- [ ] Os dois arquivos nos paths e namespaces de "O que gera", cada um com o `RootNamespace` do próprio `.csproj`; entidade importada pelo `EntityNamespace` real (CONV-010/030/013).
+- [ ] Implementação `sealed`, um tipo por arquivo, file-scoped namespace, implementa a porta, com primary constructor (CONV-064/012/011/066/034).
+- [ ] Construtor injeta `IEfCoreRepository<{Aggregate}, {DbContextType}>`, nunca o `DbContext` direto.
+- [ ] Nome da classe `DbContext` real confirmado no repo, usado só como argumento genérico — nunca presumido como `AppDbContext`.
+- [ ] Usings presentes ou `global using` confirmado; nenhum `using` duplicado.
+- [ ] Catálogo completo na porta e na implementação: `GetByIdAsync`, `GetPagedAsync`, `CreateAsync`, `UpdateAsync`, `DeleteAsync`; nada fora dele.
+- [ ] Async + `cancellationToken` nomeado, sem default; retorna entidade, `Page<T>` ou `null`, nunca `Result` (CONV-044/074/034).
+- [ ] Sem `IQueryable`/`DbContext`/`IEfCoreRepository` na porta; só `Page<T>` como exceção (CONV-030).
+- [ ] Método de mutação faz `SaveChangesAsync` via `efRepository.DbContext`, dentro do próprio método; sem unit of work (CONV-081).
+- [ ] Cada parâmetro em sua própria linha, indentado (interface, implementação e construtor primário, mesmo com um só parâmetro).
+- [ ] Todo método com corpo em bloco (chaves); nenhum `=>` (CONV-089).
 - [ ] Método com uma única chamada async e nada depois dela não usa `async`/`await` (CONV-088).
-- [ ] Lambda com nome descritivo do papel, nunca `x`/`y`/`i`/`conf` (CONV-090).
-- [ ] `DeleteAsync` (se houver) é hard delete via `efRepository.Delete`; se a entidade precisa de soft delete, foi confirmado com o usuário em vez de assumido.
-- [ ] `GetPagedAsync` (se houver) passa `expression` e `orderExpression` — nunca omitidos, nunca `null` — e usa `entity => true`/`entity => entity.Id` como default quando o use case não pediu filtro/ordenação específicos.
-- [ ] Os dois RootNamespaces resolvidos dos respectivos `.csproj`, nenhum placeholder ou exemplo copiado.
-- [ ] Nenhum pacote novo sem confirmação, além de `JacksonVeroneze.NET.EntityFramework`/`JacksonVeroneze.NET.Pagination` já aprovados (CONV-087).
+- [ ] Lambda com nome descritivo do papel, nunca `x`/`y`/`i` (CONV-090).
+- [ ] `DeleteAsync` é hard delete via `efRepository.Delete`; se a entidade indica exclusão lógica, foi confirmado com o usuário em vez de assumido.
+- [ ] `GetPagedAsync` passa `expression` e `orderExpression`, nunca omitidos nem `null`, com `entity => true`/`entity => entity.Id` como default.
+- [ ] Zero regra de negócio na implementação (CONV-032).
+- [ ] Identificadores em inglês (CONV-063). Nenhum pacote novo além dos dois já aprovados (CONV-087).
+- [ ] Nenhum placeholder ou namespace de exemplo copiado.
+- [ ] Nenhum pré-requisito ausente foi criado por esta skill — o que faltava foi relatado, não gerado.
 
 Harness (gate — só conclui quando todos passam):
-1. `dotnet build <Application.csproj>` sem warnings.
-2. `dotnet build <Infrastructure.csproj>` sem warnings. Com CONV-002 os dois cobrem analyzers, `.editorconfig` (`IDE*`, inclusive `IDE0011` e `IDE0005`) e `BannedSymbols.txt`.
-3. `dotnet format <Application.csproj> --verify-no-changes` e o mesmo para Infrastructure.
-4. Revisão da porta gerada: grep por termos de infra (`DbContext`, `IQueryable`, `[Key]`, `[Table]`) — deve dar vazio (exceção: `Page<T>` é esperado). Se o repo já tiver um teste de arquitetura automatizado para isso, rode-o em vez do grep.
+1. `dotnet build <Application.csproj>` sem warning.
+2. `dotnet build <Infrastructure.csproj>` sem warning. Com CONV-002, os dois cobrem analyzer, `.editorconfig` (`IDE*`, inclusive `IDE0011` e `IDE0005`) e `BannedSymbols.txt`.
+3. `dotnet format <Application.csproj> --verify-no-changes` e o mesmo para a Infrastructure, sem diferença.
+4. Revisão da porta gerada: grep por termos de infra (`DbContext`, `IQueryable`, `IEfCoreRepository`, `[Key]`, `[Table]`) — deve dar vazio. Se o repo já tiver teste de arquitetura automatizado para isso, rode-o em vez do grep.
 
-Se qualquer comando falhar por erro de ambiente/ferramenta (timeout, processo que não inicia,
-etc.) em vez de reprovar por conteúdo do arquivo, **não trate como passo concluído**: tente
-novamente uma vez e, se persistir, reporte ao usuário como Harness incompleto e pare — não
-declare a criação do repositório como concluída.
+Se algum comando falhar por erro de ambiente/ferramenta (timeout, processo que não inicia, etc.)
+em vez de reprovar por conteúdo do arquivo, não trate como passo concluído: tente de novo uma
+vez e, se persistir, reporte ao usuário como Harness incompleto e pare — não declare a criação do
+repositório como concluída.
 
 Se algum teste já referencia o tipo, ele também precisa estar verde.
