@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ROOT="$HOME/workspace/ia-skills"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGETS=(.codex .copilot .claude)
 installed=()
 
@@ -26,4 +26,4 @@ echo "==> Instalando skills"
 install_dir "$ROOT/net"
 install_dir "$ROOT/meta-skills"
 
-echo "==> Concluído: ${#installed[@]} skill(s) instalada(s) em Codex e Copilot"
+echo "==> Concluído: ${#installed[@]} skill(s) instalada(s) em ${TARGETS[*]}"
