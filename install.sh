@@ -1,20 +1,29 @@
 #!/bin/bash
 
-echo "==> Instalando skills"
-
+ROOT="$HOME/workspace/ia-skills"
+TARGETS=(.codex .copilot .claude)
 installed=()
 
-for d in "$HOME"/workspace/ia-skills/net/*/; do
-  d="${d%/}"
-  name="$(basename "$d")"
-  [ -f "$d/SKILL.md" ] || continue
+install_dir() {
+  local src="$1" d name t
 
-  #mkdir -p "$HOME/.codex/skills" "$HOME/.copilot/skills"
-  ln -sfn "$d" "$HOME/.codex/skills/$name"
-  ln -sfn "$d" "$HOME/.copilot/skills/$name"
+  for d in "$src"/*/; do
+    d="${d%/}"
+    name="$(basename "$d")"
+    [ -f "$d/SKILL.md" ] || continue
 
-  echo "  ✓ $name"
-  installed+=("$name")
-done
+    for t in "${TARGETS[@]}"; do
+      ln -sfn "$d" "$HOME/$t/skills/$name"
+    done
+
+    echo "  ✓ $name ($(basename "$src"))"
+    installed+=("$name")
+  done
+}
+
+echo "==> Instalando skills"
+
+install_dir "$ROOT/net"
+install_dir "$ROOT/meta-skills"
 
 echo "==> Concluído: ${#installed[@]} skill(s) instalada(s) em Codex e Copilot"
