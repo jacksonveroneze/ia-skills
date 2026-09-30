@@ -1,15 +1,14 @@
 # Pré-requisitos comuns dos use cases (verificar; se não existir, criar)
 
 Executar **antes** de qualquer padrão de use case (`get-by-id.md`, `get-paged.md` e os próximos).
-Independe da operação: serve para todo use case da Application.
+Independe da operação: serve para todo use case da Application. Os caminhos abaixo são relativos
+a `{ApplicationProjectDir}`.
 
 ## Procedimento
-1. Resolver `{ApplicationRootNamespace}` e `{EntityNamespace}` (passo 2 do Fluxo do `SKILL.md`).
+1. Usar os valores já resolvidos e declarados no passo 3 do Fluxo do `SKILL.md`: `{ApplicationRootNamespace}` e `{EntityNamespace}`. Para o Bloco A.2, resolver também `{SortDirectionNamespace}`: o namespace real de `SortDirection`, procurado pelo nome no repo e nas libs referenciadas.
 2. Para cada tipo abaixo, procurar **pelo nome** na Application (ex.: Grep `interface IBaseRequest`), não pelo caminho.
-   - **Existe** → não criar, editar nem duplicar; usar o namespace onde já está. Divergência que
-     importa (tipo base, membros, assinatura, namespace inesperado) → pare e reporte, não sobrescreva.
-     Modificadores (`sealed`/`abstract`), nome de campo privado e formatação **não** são divergência.
-   - **Não existe** → criar no caminho indicado; um tipo por arquivo (CONV-012), namespace espelhando a pasta (CONV-013).
+   - **Existe:** não criar, editar nem duplicar; usar o namespace onde já está. Divergência que importa (tipo base, membros, assinatura, namespace inesperado): pare e reporte, não sobrescreva. Modificadores (`sealed`/`abstract`), nome de campo privado e formatação **não** são divergência.
+   - **Não existe:** criar no caminho indicado; um tipo por arquivo (CONV-012), namespace espelhando a pasta (CONV-013).
 3. Ordem: Bloco A, A.2, B. Ao terminar, informar o que foi criado e o que foi reaproveitado.
 
 ## Bloco A — comum a todos os use cases (Application, uma vez por solution)
@@ -89,7 +88,7 @@ public abstract record PagedResponse<TType>
 }
 ```
 ```csharp
-// Common/Mappers/PageInfoResponseMapper.cs — PageInfo (lib Pagination) -> PageInfoResponse (CONV-031)
+// Common/Mappers/PageInfoResponseMapper.cs — PageInfo (lib Pagination) para PageInfoResponse (CONV-031)
 using JacksonVeroneze.NET.Pagination.Offset;
 using Mapster;
 using {ApplicationRootNamespace}.Common.Models.Response;
@@ -118,7 +117,8 @@ public sealed class PageInfoResponseMapper : IRegister
 ```
 ```csharp
 // Common/Models/Request/PagedRequest.cs
-// + using do namespace real de SortDirection (resolver no repo/lib)
+using {SortDirectionNamespace};                  // namespace real de SortDirection
+
 namespace {ApplicationRootNamespace}.Common.Models.Request;
 
 public abstract record PagedRequest
@@ -181,8 +181,9 @@ for paginado; nos demais, siga sem criar `PagedRequest` e registre isso no resum
 ## Bloco B — por agregado (independe de GetById ou GetPaged)
 `{Aggregate}` = tipo singular (`Account`); `{AggregateFolder}` = pasta plural (`Accounts`).
 - Campos do `{Aggregate}Response`: os pedidos pelo usuário; senão, as propriedades públicas relevantes da entidade, desempacotando value objects; dado sensível (ex.: CPF) só se pedido. Liste os campos no resumo final.
-- Já existe → faltando campo, acrescente o campo **e** o `.Map`; nunca crie um segundo response do agregado.
+- Já existe: faltando campo, acrescente o campo **e** o `.Map`; nunca crie um segundo response do agregado.
 - Um `.Map` por membro do response, inclusive os de mesmo nome (CONV-031); todo membro citado precisa existir no response e vice-versa.
+- `{Property}` é um membro do `{Aggregate}Response`; `{DomainProperty}` é a propriedade da entidade (ou o caminho dela, ex.: `Balance.Amount`) de onde o valor vem.
 
 ```csharp
 // Features/{AggregateFolder}/Common/Models/{Aggregate}Response.cs
@@ -206,7 +207,7 @@ public sealed class {Aggregate}ResponseMapper : IRegister
         ArgumentNullException.ThrowIfNull(config);
 
         config.NewConfig<{Aggregate}, {Aggregate}Response>()
-            .Map(dest => dest.Campo, src => src.CampoDoDominio);
+            .Map(dest => dest.{Property}, src => src.{DomainProperty});
     }
 }
 ```
@@ -226,12 +227,14 @@ config.NewConfig<Account, AccountResponse>()
 
 ## Anti-patterns
 - Duplicar um tipo que já existe (outro namespace, nome ou pasta), ou sobrescrever um existente em vez de reportar divergência.
-- Dois tipos no mesmo arquivo.
+- Dois tipos no mesmo arquivo (CONV-012).
 - Um `{Aggregate}Response` ou mapper de item novo por operação em vez de reusar o do `Common`.
-- Mapper por convenção (`NewConfig` sem `.Map` por membro) ou com `.Map` de membro inexistente; classe/record criado sem `sealed` (CONV-064).
+- Mapper por convenção (`NewConfig` sem `.Map` por membro) ou com `.Map` de membro inexistente (CONV-031); classe/record criado sem `sealed`, exceto tipo abstrato (CONV-064).
+- Namespace de exemplo copiado, ou placeholder (`{SortDirectionNamespace}`, `{EntityNamespace}`...) deixado literal.
 
 ## Checklist
 - [ ] Todos os itens (Bloco A: 4; A.2: 4; B: 2) foram procurados por nome antes de qualquer criação; só se criou o que faltava.
 - [ ] Um `PagedRequest` existente não foi editado; divergência foi reportada.
 - [ ] Todo membro do `{Aggregate}Response` tem `.Map`, e nenhum `.Map` aponta para membro inexistente.
+- [ ] Um tipo por arquivo, namespace espelhando a pasta (CONV-012/013).
 - [ ] Resumo final: criado, reaproveitado e campos do response.
