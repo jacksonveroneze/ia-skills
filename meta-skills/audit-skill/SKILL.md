@@ -25,6 +25,8 @@ Faltando Skill alvo ou Tarefa: pare e relate o que faltou. Não pergunte nada.
 Use a skill {skill}. {tarefa}
 
 Regras:
+- Invoque a skill pela ferramenta Skill, como faria normalmente. Não leia
+  o SKILL.md dela com Read, cat ou similar.
 - Não pergunte nada. Se faltar informação que a skill não resolve sozinha,
   pare e relate o que era esperado e onde.
 - Não crie nem altere nada fora do escopo da skill.
@@ -39,16 +41,25 @@ sobrescritas, limites, validações extras).
 
 Adapte só o trecho "declare: ..." ao que a skill alvo resolve (ex.: para `create-entity`, acrescente "agregado e campos de identidade"). Nunca acrescente dica de como resolver.
 
+### Como a skill alvo é invocada
+
+O executor **invoca a skill alvo pela ferramenta `Skill`**, exatamente como o Claude Code faria numa sessão real. Isso testa também o que o arquivo não mostra: se a `description` dispara a skill e se o conteúdo carregado pelo mecanismo de skills basta para a execução.
+
+- O avaliador **nunca** cola o conteúdo do `SKILL.md` alvo no prompt do executor, nem indica o caminho do arquivo.
+- O executor **não** lê o `SKILL.md` alvo com `Read`/`cat`. A leitura do arquivo é tarefa só do avaliador, para extrair o contrato (Passo 2).
+- Se a skill alvo não aparecer na lista de skills disponíveis do executor, ou se a chamada `Skill` falhar, a auditoria **para e relata** (skill não instalada, nome errado ou sem permissão). Não há fallback para ler o arquivo: isso mascararia justamente o problema de descoberta/carregamento da skill.
+- O subagente precisa ter a ferramenta `Skill` (use um tipo com todas as ferramentas, como `general-purpose`).
+
 ## Fluxo
 
-1. **Localizar a skill alvo.** Leia o `SKILL.md` inteiro. Se não existir, pare e relate o caminho procurado.
+1. **Localizar a skill alvo.** Confirme que ela consta nas skills disponíveis e leia o `SKILL.md` inteiro **só para o avaliador** (extrair contrato e critérios). Se não existir ou não estiver instalada, pare e relate o que procurou e onde.
 2. **Extrair o contrato.** Do `SKILL.md` alvo, levante:
    - Rules/CONV citadas e o que cada uma exige.
    - Inputs e o que a skill diz resolver sozinha (ReAct/CoT).
    - Checklist, Harness e Anti-patterns.
    - **Lacunas**: decisões plausíveis que o texto não fixa (ex.: `Trim`, `ToString` mascarado, limite de tamanho). São as variáveis que você vigiará entre execuções.
 3. **Montar os critérios** em quatro grupos. Cada item é marcado como `determinístico` (checável por comando/grep) ou `julgamento` (lido do transcript):
-   - **Fluxo** — declarou valores resolvidos antes de escrever; checou duplicidade; não perguntou; não inventou contexto.
+   - **Fluxo** — invocou a skill pela ferramenta `Skill` (sem ler o `SKILL.md` dela); declarou valores resolvidos antes de escrever; checou duplicidade; não perguntou; não inventou contexto.
    - **Estrutura** — arquivo, pasta, namespace, modificadores, construtor, proibições (`!`, `=>`, etc.), conforme o contrato.
    - **Comportamento** — o que o artefato faz, conforme o contrato; nenhuma regra além das que a skill manda.
    - **Harness** — build sem warnings, format sem diff, testes verdes.
@@ -56,11 +67,12 @@ Adapte só o trecho "declare: ..." ao que a skill alvo resolve (ex.: para `creat
    Não inclua critério que o contrato da skill não sustenta. Se o usuário pediu um e o contrato não o cobre, marque como **"fora do contrato"** e reporte como lacuna da skill, não como falha do modelo.
 4. **Preparar o estado.** Antes de cada execução, garanta o estado inicial pedido. Prefira isolamento por worktree (`isolation: "worktree"`) para as execuções não se contaminarem. Sem worktree, `git clean -fd && git checkout .` entre execuções.
 5. **Executar N vezes.** Para cada execução, dispare um subagente em contexto limpo com as regras do executor acima.
-   - O subagente **não recebe** os critérios nem este `SKILL.md`.
+   - O subagente **não recebe** os critérios, este `SKILL.md`, o conteúdo nem o caminho do `SKILL.md` alvo. Ele só recebe o prompt do executor e invoca a skill pela ferramenta `Skill`.
    - Em sequência se compartilharem pastas; em paralelo só com worktrees isoladas.
-   - Sem subagente disponível, execute inline e registre no relatório o viés (o avaliador viu os critérios).
+   - Sem subagente disponível, execute inline, também invocando a skill pela ferramenta `Skill`, e registre no relatório o viés (o avaliador viu os critérios e o `SKILL.md`).
 6. **Coletar evidências por execução:**
    - Transcript final do executor (declaração pré-escrita, resumo, decisões sem respaldo).
+   - Chamadas de ferramenta do executor: existe chamada `Skill` com o nome da skill alvo e **não** existe `Read`/`cat` do `SKILL.md` dela. Se a skill não disparou pela `Skill`, registre como falha de Fluxo (origem provável: `description` da skill ambígua ou fraca).
    - `git status --porcelain` e diff: arquivos criados/alterados.
    - Saída de `dotnet build`, `dotnet format --verify-no-changes` e testes, **rodados pelo avaliador**, sem confiar no relato do executor.
 7. **Checagens determinísticas.** Rode `grep`/scripts para o que for mecânico (modificadores, `!`, `=>`, padrão de código de erro por regex, número de arquivos novos, caminho exato). Registre o comando e o resultado.
@@ -128,6 +140,8 @@ Veredito:
 ## Anti-patterns (recusar)
 
 - Passar critérios, caminho, nome do tipo ou códigos de erro ao executor.
+- Colar o conteúdo do `SKILL.md` alvo no prompt do executor, ou mandá-lo ler o arquivo, em vez de invocar a skill pela ferramenta `Skill`.
+- Cair em fallback silencioso (ler o arquivo) quando a chamada `Skill` falha: pare e relate.
 - Confiar no relato do executor sobre build/testes em vez de rodar.
 - Aceitar execução única como prova de estabilidade.
 - Corrigir a skill alvo durante a auditoria.
