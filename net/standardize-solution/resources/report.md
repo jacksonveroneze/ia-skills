@@ -6,7 +6,7 @@ ao parar. Grupo sem linhas aparece com "nenhum".
 
 # Relatório de plano
 
-Toda linha de ação tem um identificador (`A1`, `P1`, `S1`...) para o usuário poder excluí-la na
+Toda linha de ação tem um identificador (`A1`, `P1`, `S1`, `N1`...) para o usuário poder excluí-la na
 aprovação. Ações possíveis: `criar`, `mover`, `editar`, `remover`, `acrescentar`, `atualizar`,
 `manter`, `nada`, `parar`. Linha com `parar` não pode ser aprovada: ela descreve o bloqueio.
 
@@ -20,6 +20,7 @@ Vem primeiro. O usuário deve entender o que vai acontecer sem ler as tabelas se
 | Entradas da solution a atualizar | |
 | Projetos a editar | |
 | `AssemblyName` a remover | |
+| Referências ao nome do assembly a ajustar | |
 | Bloqueios e alertas | |
 
 Arquivos a criar:
@@ -45,6 +46,14 @@ Entradas da solution a atualizar:
 | Projeto | Valor hoje | Nome do assembly depois | Alerta |
 |---|---|---|---|
 | `Billing.Api` | `Billing` | `Billing.Api` | valor diferente do nome do arquivo; o `Dockerfile` cita `Billing.dll` |
+| `Billing.IntegrationTests` | `Billing.Tests` | `Billing.IntegrationTests` | valor diferente do nome do arquivo |
+
+Referências ao nome do assembly a ajustar (`InternalsVisibleTo` e `entrypoint.sh`):
+
+| Onde (`arquivo:linhas`) | Nome hoje | Nome depois |
+|---|---|---|
+| `Api.csproj:9-11` | `Billing.Tests` | `Billing.IntegrationTests` |
+| `entrypoint.sh:3-4` | `Billing.dll` | `Billing.Api.dll` |
 
 ## 1. Identificação
 | Item | Valor |
@@ -56,8 +65,8 @@ Entradas da solution a atualizar:
 | Projetos | quantidade e lista |
 
 ## 2. Arquivos de raiz
-Uma linha por arquivo: `Directory.Build.props`, `BannedSymbols.txt`, `.editorconfig`,
-`.dockerignore`, `Dockerfile`, `nuget.config`.
+Uma linha por arquivo: `Directory.Build.props`, `.editorconfig`, `.dockerignore`, `Dockerfile`,
+`nuget.config`. O `entrypoint.sh` não entra aqui: ele é tratado na seção 7.
 
 | Id | Arquivo | Onde existe hoje | Ação | Detalhe |
 |---|---|---|---|---|
@@ -76,7 +85,6 @@ Uma linha por entrada de arquivo da solution que muda de caminho.
 |---|---|---|---|---|---|
 | D1 | `Nullable` | | | | |
 | D2 | `ImplicitUsings` | | | | |
-| D3 | `AdditionalFiles` de `BannedSymbols.txt` | "ausente" ou o `Include` atual | presente ou ausente | acrescentar, remover ou nada | `BannedSymbols.txt` vai ou não existir |
 
 Cálculo de Nullable e ImplicitUsings:
 
@@ -90,18 +98,31 @@ Uma linha por projeto e propriedade removida, ajustada ou mantida: `Nullable`, `
 | Id | Projeto | Propriedade | Valor hoje | Valor depois | Ação | Detalhe |
 |---|---|---|---|---|---|---|
 | P1 | `Billing.Api` | `AssemblyName` | `Billing` | (nome do arquivo `.csproj`) | remover | listado na visão geral |
+| P2 | `Billing.IntegrationTests` | `AssemblyName` | `Billing.Tests` | (nome do arquivo `.csproj`) | remover | listado na visão geral |
 
 ## 6. RootNamespace
 | Id | Projeto | Valor hoje | Valor calculado | Arquivos `.cs` que sustentam o valor | Ação |
 |---|---|---|---|---|---|
 
-## 7. Bloqueios e alertas
+## 7. Referências ao nome do assembly
+Uma linha por ocorrência de um `AssemblyName` removido: `InternalsVisibleTo` em qualquer `.csproj`
+e `{Old}.dll` em `entrypoint.sh`. A coluna "Onde" usa `arquivo:linhas`. Ocorrência em `Dockerfile`,
+`.cs` ou outro arquivo entra com ação `relatar` (e também na seção 8).
+
+| Id | Onde | Tipo | Nome hoje | Nome depois | Ação | Depende de |
+|---|---|---|---|---|---|---|
+| N1 | `Api.csproj:9-11` | `InternalsVisibleTo` | `Billing.Tests` | `Billing.IntegrationTests` | editar | P2 |
+| N2 | `entrypoint.sh:3-4` | `entrypoint.sh` | `Billing.dll` | `Billing.Api.dll` | editar | P1 |
+
+## 8. Bloqueios e alertas
 Tudo que faria a skill parar ou que o usuário precisa saber: propriedade condicional, valor fora
 de `enable`/`disable`, `Directory.Build.props` em outro diretório, arquivo de raiz duplicado,
 `PublishAot`, `SatelliteResourceLanguages` ou `AssemblyName` com valor diferente do esperado,
 `RootNamespace` divergente, entrada duplicada na solution, outra solution (descartada) que
-referencia arquivo movido, `.csproj` ou `Dockerfile` que cita arquivo movido ou `{AssemblyName}.dll`,
-`BannedSymbols.txt` sem o analyzer, `Dockerfile` movido (`COPY` relativo).
+referencia arquivo movido, `.csproj` ou `Dockerfile` que cita arquivo movido, `Dockerfile`, `.cs`,
+`.props`/`.targets` ou outro script que cita o nome antigo do assembly, `entrypoint.sh` que cita o
+nome antigo sem `.dll`, mapa de nomes ambíguo (dois projetos com o mesmo nome antigo), `Dockerfile`
+movido (`COPY` relativo).
 
 | Id | Onde | Situação | Efeito |
 |---|---|---|---|
@@ -133,18 +154,27 @@ Os identificadores são os do relatório de plano.
 | Projeto | Propriedades removidas (com valor anterior) | `AssemblyName` removido (valor anterior e nome depois) | Diretivas mantidas ou acrescentadas | RootNamespace |
 |---|---|---|---|---|
 
-## F5. Harness
+## F5. Referências ao nome do assembly
+| Onde (`arquivo:linhas`) | Tipo | Nome anterior | Nome novo | Resultado |
+|---|---|---|---|---|
+
+`Resultado`: `feito` ou `excluído pelo usuário` (nesse caso, a referência ainda aponta para o nome
+antigo e isso é uma pendência).
+
+## F6. Harness
 | Verificação | Resultado | Observação |
 |---|---|---|
 
 Verificações: comparação dos valores efetivos com a linha de base (as diferenças esperadas
-aparecem aqui), `dotnet sln list` e caminhos da solution, `dotnet build`, `dotnet test`. Falha de
+aparecem aqui), `dotnet sln list` e caminhos da solution, `dotnet build`, `dotnet test`, busca do
+nome antigo do assembly em `InternalsVisibleTo` e `entrypoint.sh`. Falha de
 ambiente aparece como "Harness incompleto".
 
-## F6. Fora do escopo e pendências
+## F7. Fora do escopo e pendências
 | Item | Situação |
 |---|---|
 | `TargetFramework` e `LangVersion` | não alterados |
 | Conteúdo do `Dockerfile` (`COPY` relativo, `ENTRYPOINT`, se movido ou se o `AssemblyName` mudou) | não alterado |
+| `[assembly: InternalsVisibleTo]` em `.cs`, `InternalsVisibleTo` em `.props`/`.targets`, outros scripts e `docker-compose` que citam o nome antigo | listados, não alterados |
 | Solutions descartadas que referenciam arquivo movido | não alteradas |
-| Pacotes (inclusive o analyzer de `BannedSymbols.txt`) | não alterados |
+| Pacotes | não alterados |

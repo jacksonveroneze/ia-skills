@@ -171,7 +171,7 @@ pacote e os outros locais relatados.
 - No `Dockerfile`: alterar qualquer linha além da versão da tag; trocar sufixo de variante por conta própria; trocar tag com digest; ajustar `COPY`, `ENTRYPOINT` ou `USER`; criar `Dockerfile` ausente.
 - Instalar pacote prerelease, pacote da família Microsoft com major 11, ou pacote novo (CONV-087).
 - Fixar versão no `.csproj` quando há `Directory.Packages.props` (CONV-058); subir a major de terceiro sem necessidade comprovada pelo build.
-- Corrigir código-fonte para fazer o build passar; mover ou criar `.editorconfig`, `.dockerignore`, `nuget.config` ou `BannedSymbols.txt`.
+- Corrigir código-fonte para fazer o build passar; mover ou criar `.editorconfig`, `.dockerignore` ou `nuget.config`.
 - Placeholder (`{SolutionDir}`, `{Sdk10}`, `{id}`...) deixado literal.
 
 ## Checklist + Harness

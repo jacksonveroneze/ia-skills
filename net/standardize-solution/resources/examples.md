@@ -2,10 +2,9 @@
 
 Exemplos de apoio da skill `SKILL.md`. Em conflito com a seção do arquivo, a seção vence.
 
-## Directory.Build.props novo, com `BannedSymbols.txt`
-Estado antes: sem `Directory.Build.props`; sem `BannedSymbols.txt` em `{SolutionDir}`; os projetos
-têm `Nullable` e `ImplicitUsings` em `enable`. A linha de criação do `BannedSymbols.txt` está no
-plano e foi aprovada, então o arquivo vai existir e o item `AdditionalFiles` permanece.
+## Directory.Build.props novo
+Estado antes: sem `Directory.Build.props` em `{SolutionDir}`; os projetos têm `Nullable` e
+`ImplicitUsings` em `enable`.
 
 Certo — cópia de `resources/Directory.Build.props`, com `Nullable` e `ImplicitUsings` ajustados
 (aqui, `enable`):
@@ -25,38 +24,10 @@ Certo — cópia de `resources/Directory.Build.props`, com `Nullable` e `Implici
             $(NoError);
         </NoError>
     </PropertyGroup>
-
-    <ItemGroup>
-        <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="Properties/BannedSymbols.txt"/>
-    </ItemGroup>
 </Project>
 ```
 
-## Directory.Build.props novo, sem `BannedSymbols.txt`
-Estado antes: igual ao anterior, mas o usuário excluiu a linha de criação do `BannedSymbols.txt`; o
-arquivo não vai existir.
-
-Errado — o item `AdditionalFiles` fica apontando para um arquivo que não existe.
-
-Certo — o mesmo arquivo, sem o `ItemGroup`:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-
-<Project>
-    <PropertyGroup>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <PublishAot>false</PublishAot>
-        <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
-        <NoWarn>
-            $(NoWarn)
-        </NoWarn>
-        <NoError>
-            $(NoError);
-        </NoError>
-    </PropertyGroup>
-</Project>
-```
+Errado — acrescentar `TargetFramework`, `LangVersion` ou qualquer item que não esteja no resource.
 
 ## Caso misto, sem `Directory.Build.props` existente
 Estado antes, três projetos:
@@ -101,19 +72,51 @@ Cálculo: o `Domain` herda `enable` do arquivo existente, então o valor efetivo
 Errado — o `Domain` tratado como `disable` por não ter a diretiva: ele ganharia
 `<ImplicitUsings>disable</ImplicitUsings>` e mudaria de comportamento.
 
-## AssemblyName
-Estado antes: `Billing.Api.csproj` com `<AssemblyName>Billing</AssemblyName>`; o `Dockerfile` tem
-`ENTRYPOINT ["dotnet", "Billing.dll"]`.
+## AssemblyName, InternalsVisibleTo e entrypoint.sh
+Estado antes:
+- `Billing.Api.csproj` com `<AssemblyName>Billing</AssemblyName>`.
+- `Billing.IntegrationTests.csproj` com `<AssemblyName>Billing.Tests</AssemblyName>`.
+- `Billing.Api.csproj`, linhas 9-11:
+  ```xml
+  <ItemGroup>
+    <InternalsVisibleTo Include="Billing.Tests" />
+  </ItemGroup>
+  ```
+- `entrypoint.sh`, linhas 3-4: `exec dotnet Billing.dll "$@"`.
+- `Dockerfile`: `ENTRYPOINT ["dotnet", "Billing.dll"]`.
 
-Certo — a skill remove o `AssemblyName` e lista nas tabelas de resumo:
+Mapa de nomes: `Billing` para `Billing.Api` e `Billing.Tests` para `Billing.IntegrationTests`.
+
+Certo — a skill remove os dois `AssemblyName`, troca o `InternalsVisibleTo` (que está num projeto
+diferente do que perdeu o `AssemblyName`) e o `entrypoint.sh`, e lista tudo no plano:
 
 | Projeto | Valor hoje | Nome do assembly depois | Alerta |
 |---|---|---|---|
 | `Billing.Api` | `Billing` | `Billing.Api` | valor diferente do nome do arquivo; o `Dockerfile` cita `Billing.dll` |
+| `Billing.IntegrationTests` | `Billing.Tests` | `Billing.IntegrationTests` | valor diferente do nome do arquivo |
 
-O `Dockerfile` não é alterado.
+| Id | Onde | Hoje | Depois | Ação |
+|---|---|---|---|---|
+| N1 | `Billing.Api.csproj:10` | `InternalsVisibleTo Include="Billing.Tests"` | `Include="Billing.IntegrationTests"` | editar |
+| N2 | `entrypoint.sh:3-4` | `dotnet Billing.dll` | `dotnet Billing.Api.dll` | editar |
 
-Errado — remover o `AssemblyName` sem listá-lo, ou ajustar o `ENTRYPOINT` do `Dockerfile`.
+Depois da execução:
+```xml
+<ItemGroup>
+  <InternalsVisibleTo Include="Billing.IntegrationTests" />
+</ItemGroup>
+```
+`exec dotnet Billing.Api.dll "$@"`, com o fim de linha e a permissão de execução do arquivo
+originais. O `Dockerfile` não é alterado: o `ENTRYPOINT` aparece como alerta.
+
+Valor com sufixo — só a parte do nome muda:
+`Include="Billing.Tests, PublicKey=0024..."` vira `Include="Billing.IntegrationTests, PublicKey=0024..."`.
+
+Errado — remover o `AssemblyName` e deixar `Billing.Tests` no `InternalsVisibleTo` (os testes
+deixam de enxergar os tipos `internal`); deixar `Billing.dll` no `entrypoint.sh` (o contêiner
+não sobe); recriar o `entrypoint.sh` com outro fim de linha ou sem a permissão de execução; ajustar o
+`ENTRYPOINT` do `Dockerfile` ou um `[assembly: InternalsVisibleTo]` de `.cs`; remover o
+`AssemblyName` sem listá-lo no plano.
 
 ## Atualizar a solution quando um arquivo é movido
 Estado antes: `.editorconfig` em `app/.editorconfig`; solution em `app/src/Bank.sln` (ou
