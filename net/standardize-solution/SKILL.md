@@ -1,6 +1,6 @@
 ---
 name: standardize-solution
-description: 'Padroniza uma solution .NET existente sem mudar versão de framework nem pacotes: cria ou ajusta o Directory.Build.props (Nullable, ImplicitUsings, PublishAot, SatelliteResourceLanguages), remove essas propriedades dos .csproj, acrescenta RootNamespace, move Dockerfile, .dockerignore, nuget.config e .editorconfig para a pasta da solution e cria o BannedSymbols.txt. Use sempre que o usuário pedir para padronizar, organizar ou uniformizar os arquivos e projetos de uma solution .NET, mesmo sem citar os arquivos. Não use para migrar a versão do .NET nem para atualizar pacotes.'
+description: 'Padroniza uma solution .NET existente sem mudar versão de framework nem pacotes: cria ou ajusta o Directory.Build.props, limpa os .csproj (propriedades gerenciadas, AssemblyName, RootNamespace), move Dockerfile, .dockerignore, nuget.config e .editorconfig para a pasta da solution (atualizando o caminho no arquivo da solution), e cria .editorconfig, .dockerignore e BannedSymbols.txt quando ausentes. Use sempre que o usuário pedir para padronizar, organizar ou uniformizar os arquivos e projetos de uma solution .NET, mesmo sem citar os arquivos. Não use para migrar a versão do .NET nem para atualizar pacotes.'
 allowed-tools:
   - Read
   - Glob
@@ -14,21 +14,23 @@ allowed-tools:
 
 Uniformiza os arquivos de raiz e de projeto da solution sem mudar o comportamento dos projetos: o
 valor efetivo de `Nullable` e de `ImplicitUsings` de cada projeto continua o mesmo depois da
-skill. Não altera versão de framework, `LangVersion` nem pacotes.
+skill. Não altera versão de framework, `LangVersion` nem pacotes. As regras de cada arquivo estão
+na seção dele, em "Arquivos"; o Fluxo só dá a ordem.
 
-Em conflito entre o Template canônico e os Exemplos, o Template vence — os exemplos são reforço
-didático, não a fonte primária.
+Em conflito entre o conteúdo de uma seção e os Exemplos, a seção vence — os exemplos são reforço
+didático, não a fonte primária. O conteúdo de arquivo novo vem de `resources/`.
 
 ## O que gera
 Antes de qualquer alteração, produz o relatório de plano e espera a aprovação do usuário. Depois,
 em `{SolutionDir}` (diretório do arquivo `.sln`/`.slnx`, esperado em `app/src`):
-- **Cria, se ausente:** `Directory.Build.props`, `BannedSymbols.txt`.
+- **Cria, se ausente, copiando de `resources/`:** `Directory.Build.props`, `BannedSymbols.txt`, `.editorconfig`, `.dockerignore`.
 - **Move para `{SolutionDir}`, se estiver em outro diretório:** `Dockerfile`, `.dockerignore`, `nuget.config`, `.editorconfig`.
-- **Edita:** o `Directory.Build.props` existente (só as quatro propriedades gerenciadas) e cada `.csproj` (remove essas propriedades, ajusta `Nullable`/`ImplicitUsings`, acrescenta `RootNamespace`).
+- **Edita:** o `Directory.Build.props` existente, cada `.csproj` e o arquivo da solution (só o caminho de arquivo movido).
 
-Nada além disso: não altera `.cs`, `TargetFramework`, `LangVersion`, `global.json`, pacotes, o
-conteúdo do `Dockerfile`, pipeline de CI, `appsettings` nem `launchSettings`. Se um pré-requisito
-faltar, esta skill para (ver Pré-condições) em vez de criá-lo.
+Nada além disso: não cria `Dockerfile` nem `nuget.config`, não altera `.cs`, `TargetFramework`,
+`LangVersion`, `global.json`, pacotes, o conteúdo de arquivo existente (exceto o dos dois primeiros
+itens acima), pipeline de CI, `appsettings` nem `launchSettings`. Se um pré-requisito faltar, esta
+skill para (ver Pré-condições) em vez de criá-lo.
 
 ## Escopo (quando usar / NÃO usar)
 - **Usar:** solution com projetos SDK-style, em qualquer versão de framework, cujos arquivos e propriedades precisam seguir o padrão.
@@ -37,88 +39,62 @@ faltar, esta skill para (ver Pré-condições) em vez de criá-lo.
 ## Contrato
 
 ### Regras desta skill
-- **Local — fonte da verdade.** `{SolutionDir}/Directory.Build.props` define `Nullable`, `ImplicitUsings`, `PublishAot` e `SatelliteResourceLanguages` para todos os projetos. O `.csproj` não repete essas propriedades.
-- **Local — Nullable e ImplicitUsings.** O valor efetivo de um projeto é o que o MSBuild avalia para ele (`dotnet msbuild {csproj} -getProperty:Nullable,ImplicitUsings`), o que já inclui o valor herdado do `Directory.Build.props` existente; resultado vazio conta como `disable`. Em `ImplicitUsings`, `true` e `false` valem como `enable` e `disable`. O valor do `Directory.Build.props` sai da tabela do Template canônico. Valor que não seja `enable` nem `disable`, ou diretiva condicional: pare e relate.
 - **Local — qual solution.** Procura-se em `app/src`. Solution cujo nome de arquivo, ou de qualquer pasta do caminho, contém `E2E` (sem diferenciar maiúscula) é ignorada, junto com a pasta dela.
 - **Local — aprovação.** A skill só escreve, cria ou move depois de o usuário aprovar o relatório de plano (Gate de aprovação).
+- **Local — resources.** `resources/` guarda o conteúdo de todo arquivo que a skill cria. O arquivo novo é cópia literal do resource; os únicos ajustes permitidos são os que a seção do arquivo descreve. Resource ilegível ou ausente: pare e relate.
+- **Local — regra de movimentação** (vale para `Dockerfile`, `.dockerignore`, `nuget.config`, `.editorconfig`). Procure o arquivo por **nome**, na árvore de `{SolutionDir}` e nos diretórios ancestrais até `{RepoRoot}` (ignorando `bin`, `obj`, `.git`, `node_modules` e as pastas das solutions descartadas). Só em `{SolutionDir}`: nada a fazer. Em exatamente um outro diretório: mova para `{SolutionDir}` (`git mv` se estiver sob git, senão `mv`) e atualize o caminho na solution (seção "Solution"). Em `{SolutionDir}` e também em outro lugar, ou em mais de um outro diretório: pare e relate. Em nenhum lugar: vale o "Ausente" da seção do arquivo.
 
 ### Rules gerais (dotnet-conventions.md)
-- **CONV-001** o `.csproj` não repete as propriedades do `Directory.Build.props`. *Local desta skill:* o arquivo fica em `{SolutionDir}`, a lista de propriedades é a da regra local acima, e `TargetFramework` e `LangVersion` não são tocados.
+- **CONV-001** o `.csproj` não repete as propriedades do `Directory.Build.props`. *Local desta skill:* o arquivo fica em `{SolutionDir}`, a lista de propriedades é a da seção `Directory.Build.props`, e `TargetFramework` e `LangVersion` não são tocados.
 
 ### Pré-condições
 - `app/src` existe e, descartadas as solutions `E2E`, contém exatamente um arquivo `.sln`/`.slnx` (ou o caminho foi informado).
 - Todo `.csproj` da solution é SDK-style e o MSBuild o avalia sem erro.
+- Os quatro arquivos de `resources/` existem.
 
 Se alguma falhar, esta skill para e relata o que falta e onde era esperado — sem apontar como resolver.
 
 ### Inputs
 1. **Solution** (opcional) — caminho do `.sln`/`.slnx`. Omitido: procurar em `app/src` (Fluxo, passo 1).
 
-Não há outro input. Nullable, ImplicitUsings e RootNamespace são calculados a partir dos projetos.
+Não há outro input. Valores de Nullable, ImplicitUsings e RootNamespace são calculados.
 
 ## Fluxo (ReAct)
 
 **Fase 0 — Identificação e plano (somente leitura)**
-1. **Localizar a solution.** Sem caminho informado, procure `.sln`/`.slnx` recursivamente em `{RepoRoot}/app/src` (`{RepoRoot}` é a raiz do repositório git; sem git, o diretório atual). Descarte as solutions `E2E`. Restando exatamente uma, ela é `{Solution}` e o diretório dela é `{SolutionDir}`; zero ou mais de uma: pare e pergunte. As descartadas, e a pasta de cada uma, ficam fora de todas as buscas seguintes e entram no relatório. Liste os projetos com `dotnet sln {Solution} list`.
+1. **Localizar a solution.** Sem caminho informado, procure `.sln`/`.slnx` recursivamente em `{RepoRoot}/app/src` (`{RepoRoot}` é a raiz do repositório git; sem git, o diretório atual). Descarte as solutions `E2E`. Restando exatamente uma, ela é `{Solution}` e o diretório dela é `{SolutionDir}`; zero ou mais de uma: pare e pergunte. As descartadas, e a pasta de cada uma, ficam fora de todas as buscas e entram no relatório. Liste os projetos com `dotnet sln {Solution} list`.
 2. **Checar as Pré-condições.** Falhou alguma: pare e relate.
-3. **Coletar o estado.** Para cada `.csproj`, leia no XML as propriedades gerenciadas e `RootNamespace` (declaradas ou não, com ou sem `Condition`) e avalie o valor efetivo com `dotnet msbuild {csproj} -getProperty:Nullable,ImplicitUsings,PublishAot,SatelliteResourceLanguages,TargetFramework,LangVersion`: esse resultado é a linha de base do Harness. Procure por **nome**, na árvore de `{SolutionDir}` e nos diretórios ancestrais até `{RepoRoot}` (ignorando `bin`, `obj`, `.git`, `node_modules` e as pastas das solutions descartadas): `Directory.Build.props`, `Dockerfile`, `.dockerignore`, `nuget.config`, `.editorconfig`, `BannedSymbols.txt`.
-4. **Calcular o plano.** Valor de `Nullable` e de `ImplicitUsings` (tabela do Template canônico), `RootNamespace` de cada projeto (passo 9) e a ação de cada arquivo (criar, mover, editar, nada, parar), aplicando no papel as regras da Fase 1.
-5. **Apresentar o relatório de plano** no formato de `report.md` (seção "Relatório de plano") e parar. A visão geral vem primeiro: arquivos a criar, arquivos a mover e projetos a editar.
+3. **Levantar.** Execute o "Levantar" de cada seção de "Arquivos", na mesma ordem do passo 6 (a seção Solution é a última porque depende de quais arquivos serão movidos).
+4. **Calcular o plano.** Aplique no papel o "Executar" de cada seção.
+5. **Apresentar o relatório de plano** no formato de `report.md` (seção "Relatório de plano") e parar. A visão geral vem primeiro: arquivos a criar, arquivos a mover, entradas da solution a atualizar, `AssemblyName` a remover.
 
 **Gate de aprovação**
 - Nada é criado, movido ou editado antes da aprovação explícita do usuário ("aprovo", "pode executar"). Pergunta, ajuste ou comentário não é aprovação: responda e reapresente o relatório.
-- Aprovação parcial (o usuário exclui linhas): execute só o aprovado.
+- Aprovação parcial (o usuário exclui linhas): execute só o aprovado. Linha de movimentação excluída também exclui a atualização da solution correspondente.
 - Divergência durante a execução em relação ao relatório aprovado (arquivo novo, valor diferente): pare e reapresente o relatório atualizado.
 - Se a ferramenta oferecer modo plan (ex.: `EnterPlanMode`/`ExitPlanMode`), use-o para apresentar o relatório. Ele não substitui este gate.
 
 **Fase 1 — Padronização (após a aprovação)**
-6. **`Directory.Build.props`.**
-   - Existe em outro diretório (subdiretório de `{SolutionDir}` ou ancestral até `{RepoRoot}`): pare e relate; não crie duplicata nem mova.
-   - Não existe: crie em `{SolutionDir}` com o Template canônico.
-   - Existe em `{SolutionDir}`: não sobrescreva. Ajuste só as quatro propriedades gerenciadas para os valores do Template (acrescente as ausentes), preserve todo o resto (inclusive `TargetFramework` e `LangVersion`, se houver), e relate o que mudou.
-7. **Cada `.csproj`.**
-   - Remova `PublishAot` e `SatelliteResourceLanguages`, qualquer que seja o valor; valor diferente do global entra no relatório final (`projeto: propriedade, valor anterior`).
-   - `Nullable` e `ImplicitUsings` seguem a tabela.
-   - Propriedade com `Condition` (própria ou do `PropertyGroup`): não remova; relate.
-   - `PropertyGroup` que ficar vazio é removido. Preserve indentação e o restante do arquivo.
-8. **Arquivos de raiz.**
-   - `Dockerfile`, `.dockerignore`, `nuget.config`, `.editorconfig`: já em `{SolutionDir}` e em nenhum outro lugar, nada a fazer. Em exatamente um outro diretório, mova para `{SolutionDir}` (`git mv` se estiver sob git, senão `mv`). Em `{SolutionDir}` e também em outro lugar, ou em mais de um outro diretório, pare e relate. Não encontrado: relate a ausência, não crie.
-   - `BannedSymbols.txt`: não existe: crie em `{SolutionDir}` com o conteúdo do Template canônico. Existe: não altere.
-9. **`RootNamespace`.** Para cada projeto sem `RootNamespace`:
-   - Leia os `namespace` declarados nos `.cs` do projeto (ignorando `bin`/`obj` e arquivos gerados) e calcule o maior prefixo, por segmento, comum a todos eles.
-   - Acrescente `<RootNamespace>{prefixo}</RootNamespace>` no primeiro `PropertyGroup` do `.csproj`; sem nenhum, crie um.
-   - Sem `.cs` com namespace, ou sem prefixo comum: não acrescente; relate o projeto.
-   - Já existe `RootNamespace`: não altere; se divergir do calculado, relate os dois valores.
+6. Execute o "Executar" de cada seção de "Arquivos", nesta ordem: `.editorconfig`, `.dockerignore`, `Dockerfile`, `nuget.config`, `BannedSymbols.txt`, `Directory.Build.props`, `.csproj`, Solution (por último, depois de todas as movimentações).
 
 **Fase 2 — Verificação**
-10. Verificar pelo Checklist + Harness. Falha causada pela padronização: pare e relate; não edite código-fonte.
+7. Verificar pelo Checklist + Harness. Falha causada pela padronização: pare e relate; não edite código-fonte.
 
-## Raciocínio antes de escrever (CoT)
-- Qual o valor efetivo de `Nullable` e de `ImplicitUsings` em cada projeto, já contando o herdado do `Directory.Build.props` existente? Todos iguais, ou misto?
-- No caso misto, quais projetos precisam receber a diretiva explícita para não herdar `enable` e mudar de comportamento?
-- Alguma propriedade é condicional, ou tem valor fora de `enable`/`disable`? Se sim, pare.
-- Há `PublishAot` ou `SatelliteResourceLanguages` com valor diferente do global em algum projeto? Vai para o relatório como linha própria.
-- O prefixo de namespace calculado é o da raiz do projeto ou de uma subpasta (poucos arquivos)? Relate o valor e quantos arquivos o sustentam.
+## Arquivos
 
-## Template canônico
+### Solution (`.sln`/`.slnx`)
+- **Local:** `{Solution}`, onde já está. O arquivo nunca é movido.
+- **Levantar:** leia o arquivo da solution e liste as entradas de arquivo (em `.sln`, as linhas dentro de `ProjectSection(SolutionItems)`; em `.slnx`, os `<File Path="...">`) cujo caminho, resolvido a partir de `{SolutionDir}`, é o de um arquivo que a regra de movimentação vai mover. Leia também as solutions descartadas: referência delas a arquivo que será movido entra como alerta.
+- **Executar (depois das movimentações):** troque o caminho de cada entrada levantada pelo caminho novo, relativo a `{SolutionDir}` (o próprio nome do arquivo). Em `.sln`, os dois lados de `caminho = caminho`. Preserve o separador, a codificação, o BOM e o fim de linha do arquivo; não reordene, não acrescente nem remova entrada. Entrada que passaria a duplicar outra já existente: pare e relate.
+- **Não faz:** não acrescenta à solution os arquivos criados por esta skill, nem os que já estavam em `{SolutionDir}`.
 
-`Directory.Build.props` (`{SolutionDir}/Directory.Build.props`). `{Nullable}` e `{ImplicitUsings}` são
-placeholders: substitua pelo valor calculado na tabela abaixo, nunca deixe literal.
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-
-<Project>
-    <PropertyGroup>
-        <Nullable>{Nullable}</Nullable>
-        <ImplicitUsings>{ImplicitUsings}</ImplicitUsings>
-        <PublishAot>false</PublishAot>
-        <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
-    </PropertyGroup>
-</Project>
-```
-
-Tabela de decisão (vale para `Nullable` e, separadamente, para `ImplicitUsings`):
+### `Directory.Build.props`
+- **Local:** `{SolutionDir}/Directory.Build.props`. Existe em outro diretório (subdiretório de `{SolutionDir}` ou ancestral até `{RepoRoot}`): pare e relate; não crie duplicata nem mova.
+- **Levantar:** se existir, leia as quatro propriedades gerenciadas (`Nullable`, `ImplicitUsings`, `PublishAot`, `SatelliteResourceLanguages`) e o item `AdditionalFiles` de `BannedSymbols.txt`. Calcule os valores com a tabela abaixo.
+- **Ausente:** copie `resources/Directory.Build.props` e ajuste `Nullable` e `ImplicitUsings` para os valores calculados. O arquivo não traz `TargetFramework` nem `LangVersion`.
+- **Existente:** não sobrescreva. Ajuste só as quatro propriedades gerenciadas para os valores do resource (acrescente as ausentes) e preserve todo o resto, inclusive `TargetFramework`, `LangVersion`, `NoWarn` e `NoError`. Relate o que mudou.
+- **`BannedSymbols.txt` no arquivo (avaliar por solution):** o item `AdditionalFiles` do resource só pode existir se `{SolutionDir}/BannedSymbols.txt` existe ou vai existir depois da aprovação. Vai existir: mantenha o item no arquivo novo e acrescente-o ao existente, se faltar. Não vai existir (linha de criação excluída): remova o item do arquivo novo e não o acrescente ao existente. Item já existente com outro `Include`: preserve e relate.
+- **Valor efetivo de `Nullable` e `ImplicitUsings`.** É o que o MSBuild avalia para o projeto (`dotnet msbuild {csproj} -getProperty:Nullable,ImplicitUsings`), o que já inclui o valor herdado do `Directory.Build.props` existente; resultado vazio conta como `disable`. Em `ImplicitUsings`, `true` e `false` valem como `enable` e `disable`. Valor que não seja `enable` nem `disable`, ou diretiva condicional: pare e relate.
 
 | Situação nos projetos | Valor no `Directory.Build.props` | No `.csproj` |
 |---|---|---|
@@ -126,59 +102,87 @@ Tabela de decisão (vale para `Nullable` e, separadamente, para `ImplicitUsings`
 | Todos com valor efetivo `enable` | `enable` | remover a diretiva, se houver |
 | Misto | `enable` | projeto de valor efetivo `enable`: remover a diretiva, se houver; projeto de valor efetivo `disable`: manter ou acrescentar `disable` explícito |
 
-`BannedSymbols.txt` (`{SolutionDir}/BannedSymbols.txt`), conteúdo literal:
+### `.csproj` (cada projeto da solution)
+- **Local:** onde já está.
+- **Levantar:** leia no XML `AssemblyName`, `RootNamespace` e as propriedades gerenciadas (declaradas ou não, com ou sem `Condition`). Avalie com `dotnet msbuild {csproj} -getProperty:Nullable,ImplicitUsings,PublishAot,SatelliteResourceLanguages,TargetFramework,LangVersion,AssemblyName`: é a linha de base do Harness. Se o `.csproj` ou um `Dockerfile` citar pelo nome um arquivo que será movido, ou citar `{AssemblyName}.dll`, registre como alerta (não é alterado).
+- **Executar:**
+  - Remova `PublishAot` e `SatelliteResourceLanguages`, qualquer que seja o valor; valor diferente do global entra no relatório.
+  - Remova `AssemblyName`, qualquer que seja o valor. Todo `AssemblyName` removido entra nas tabelas de resumo, com o valor anterior e o nome do assembly depois (o nome do arquivo `.csproj`); quando o valor anterior era diferente desse nome, é alerta.
+  - `Nullable` e `ImplicitUsings` seguem a tabela da seção `Directory.Build.props`.
+  - Propriedade com `Condition` (própria ou do `PropertyGroup`): não remova; relate.
+  - `PropertyGroup` que ficar vazio é removido. Preserve indentação e o restante do arquivo.
+- **`RootNamespace`.** Para cada projeto sem `RootNamespace`, leia os `namespace` declarados nos `.cs` do projeto (ignorando `bin`/`obj` e arquivos gerados) e calcule o maior prefixo, por segmento, comum a todos eles. Acrescente `<RootNamespace>{prefixo}</RootNamespace>` no primeiro `PropertyGroup` do `.csproj` (sem nenhum, crie um). Sem `.cs` com namespace, ou sem prefixo comum: não acrescente e relate o projeto. Já existe `RootNamespace`: não altere; se divergir do calculado, relate os dois valores.
 
-```text
-# https://github.com/dotnet/roslyn-analyzers/blob/master/src/Microsoft.CodeAnalysis.BannedApiAnalyzers/BannedApiAnalyzers.Help.md
-P:System.DateTime.Now;Use System.DateTime.UtcNow instead
-P:System.DateTimeOffset.Now;Use System.DateTimeOffset.UtcNow instead
-P:System.DateTimeOffset.DateTime;Use System.DateTimeOffset.UtcDateTime instead
-T:Newtonsoft.Json;Don't use Newtonsoft, use System.Text.Json
-T:Newtonsoft.Json.JsonPropertyAttribute;Don't use Newtonsoft
-```
+### `BannedSymbols.txt`
+- **Local:** `{SolutionDir}/BannedSymbols.txt`. Regra de movimentação não se aplica: só se procura em `{SolutionDir}`.
+- **Ausente:** copie `resources/BannedSymbols.txt`.
+- **Existente:** não altere.
+- **Alerta:** nenhum `.csproj`, `Directory.Build.props` ou `Directory.Packages.props` referencia `Microsoft.CodeAnalysis.BannedApiAnalyzers`: o arquivo existe mas não é aplicado. Só relate; esta skill não adiciona pacote.
 
-`RootNamespace` no `.csproj`: `{RootNamespace}` é o prefixo calculado no passo 9, nunca copiado de exemplo.
+### `.editorconfig`
+- **Local:** `{SolutionDir}/.editorconfig` (regra de movimentação).
+- **Ausente:** copie `resources/.editorconfig`.
+- **Existente:** não altere o conteúdo.
 
-```xml
-<PropertyGroup>
-    <RootNamespace>{RootNamespace}</RootNamespace>
-</PropertyGroup>
-```
+### `.dockerignore`
+- **Local:** `{SolutionDir}/.dockerignore` (regra de movimentação).
+- **Ausente:** copie `resources/.dockerignore`.
+- **Existente:** não altere o conteúdo.
+
+### `Dockerfile`
+- **Local:** `{SolutionDir}/Dockerfile` (regra de movimentação).
+- **Ausente:** relate, não crie (não há resource).
+- **Existente:** não altere o conteúdo. Movido, os `COPY` com caminho relativo podem quebrar: relate como alerta, sem ajustar.
+
+### `nuget.config`
+- **Local:** `{SolutionDir}/nuget.config` (regra de movimentação).
+- **Ausente:** relate, não crie (não há resource).
+- **Existente:** não altere o conteúdo.
+
+## Raciocínio antes de escrever (CoT)
+- Qual o valor efetivo de `Nullable` e de `ImplicitUsings` em cada projeto, já contando o herdado do `Directory.Build.props` existente? Todos iguais, ou misto?
+- Algum arquivo será movido? A solution o referencia? Outra solution (descartada) o referencia?
+- `BannedSymbols.txt` vai existir depois da aprovação? Só então o item `AdditionalFiles` entra no `Directory.Build.props`.
+- Algum `.csproj` tem `AssemblyName`? Qual o efeito no nome do assembly e no `Dockerfile`?
+- Alguma propriedade é condicional, ou tem valor fora de `enable`/`disable`? Se sim, pare.
+- O prefixo de namespace calculado é o da raiz do projeto ou de uma subpasta (poucos arquivos)? Relate o valor e quantos arquivos o sustentam.
 
 ## Exemplos (certo/errado)
-Leia `examples.md` antes da Fase 1: ele mostra o caso misto de `Nullable`/`ImplicitUsings`, o caso
-de diretiva ausente com `Directory.Build.props` existente e o `.csproj` resultante.
+Leia `examples.md` antes da Fase 1: `Directory.Build.props` com e sem `BannedSymbols.txt`, caso misto de
+`Nullable`/`ImplicitUsings`, diretiva ausente com arquivo existente, `AssemblyName` e atualização da
+solution (`.sln` e `.slnx`).
 
 ## Anti-patterns (recusar)
 - Escrever, criar ou mover qualquer coisa antes da aprovação do relatório; tratar pergunta ou comentário como aprovação.
-- Considerar a solution `E2E`, ou procurar arquivos de raiz dentro da pasta dela.
-- Sobrescrever um `Directory.Build.props` existente em vez de ajustar só as quatro propriedades gerenciadas.
-- Criar `Directory.Build.props` em `{SolutionDir}` quando já existe outro em subdiretório ou ancestral (duas fontes da verdade).
-- Tocar em `TargetFramework`, `LangVersion`, `global.json` ou pacotes.
-- Deixar `PublishAot` ou `SatelliteResourceLanguages` no `.csproj`; repetir `Nullable`/`ImplicitUsings` com o mesmo valor do global (CONV-001).
-- Remover `Nullable`/`ImplicitUsings` de um projeto de valor efetivo `disable` no caso misto, sem deixar `disable` explícito.
-- Tratar diretiva ausente como `disable` quando o `Directory.Build.props` existente já define a propriedade.
+- Mover arquivo e não atualizar o caminho dele na solution; ou acrescentar à solution arquivo que ela não referenciava.
+- Considerar a solution `E2E`, ou procurar arquivos dentro da pasta dela.
+- Sobrescrever um `Directory.Build.props` existente; criar outro em `{SolutionDir}` quando já existe em subdiretório ou ancestral.
+- Deixar no `Directory.Build.props` o item `AdditionalFiles` de `BannedSymbols.txt` que não existe.
+- Tocar em `TargetFramework`, `LangVersion`, `global.json` ou pacotes; alterar o conteúdo de arquivo de raiz existente.
+- Deixar `PublishAot`, `SatelliteResourceLanguages` ou `AssemblyName` no `.csproj`; remover `AssemblyName` sem listá-lo nas tabelas de resumo.
+- Remover `Nullable`/`ImplicitUsings` de um projeto de valor efetivo `disable` no caso misto, sem deixar `disable` explícito; tratar diretiva ausente como `disable` quando o `Directory.Build.props` existente já define a propriedade.
 - Remover propriedade condicional sem parar e relatar.
-- Criar `nuget.config`, `.editorconfig`, `Dockerfile` ou `.dockerignore` que não existiam; alterar o conteúdo deles. Sobrescrever `BannedSymbols.txt` existente.
-- `RootNamespace` copiado dos exemplos, ou placeholder (`{Nullable}`, `{RootNamespace}`...) deixado literal.
+- Criar `Dockerfile` ou `nuget.config` que não existiam; escrever arquivo novo que não seja cópia do resource.
+- `RootNamespace` copiado dos exemplos, ou placeholder (`{RootNamespace}`, `{SolutionDir}`...) deixado literal.
 
 ## Checklist + Harness
 
 Checklist:
 - [ ] Fase 0 sem nenhuma escrita; relatório de plano apresentado no formato de `report.md`; execução só depois da aprovação explícita.
 - [ ] Solution escolhida em `app/src`, com as `E2E` descartadas e listadas no relatório.
-- [ ] `Directory.Build.props` único, em `{SolutionDir}`, com as quatro propriedades e os valores calculados pela tabela (CONV-001).
-- [ ] Nenhum `.csproj` repete as propriedades gerenciadas; `disable` explícito só onde o projeto diverge do global; valores removidos que diferiam estão no relatório final.
+- [ ] Todo arquivo movido está em `{SolutionDir}` e a entrada dele na solution, quando existia, aponta para o caminho novo; nenhuma outra entrada foi alterada.
+- [ ] `Directory.Build.props` único, em `{SolutionDir}`, com as quatro propriedades e os valores da tabela (CONV-001); item `AdditionalFiles` presente só se `BannedSymbols.txt` existe.
+- [ ] Nenhum `.csproj` repete as propriedades gerenciadas nem tem `AssemblyName`; cada `AssemblyName` removido está nas tabelas de resumo.
 - [ ] Todo `.csproj` tem `RootNamespace` (ou o motivo de não ter está no relatório final).
-- [ ] `Dockerfile`, `.dockerignore`, `nuget.config` e `.editorconfig` estão em `{SolutionDir}` (ou a ausência/ambiguidade foi relatada), sem conteúdo alterado.
-- [ ] `BannedSymbols.txt` presente em `{SolutionDir}`, conteúdo conforme o Template.
-- [ ] Nenhum `.cs`, `TargetFramework`, `LangVersion`, `global.json`, pacote, Dockerfile (conteúdo), pipeline ou `appsettings` foi alterado.
+- [ ] Arquivo criado é cópia do resource (com os ajustes da seção, se houver); nenhum `Dockerfile` ou `nuget.config` foi criado.
+- [ ] Nenhum `.cs`, `TargetFramework`, `LangVersion`, `global.json`, pacote, conteúdo de arquivo existente, pipeline ou `appsettings` foi alterado.
 - [ ] Relatório final apresentado em tabelas.
 
 Harness (gate — só conclui quando passam):
-1. Reavaliar cada projeto com `dotnet msbuild {csproj} -getProperty:...` e comparar com a linha de base: `Nullable` e `ImplicitUsings` iguais (vazio e `disable` equivalem; `true` e `enable` equivalem); `TargetFramework` e `LangVersion` idênticos; `PublishAot` e `SatelliteResourceLanguages` iguais aos do `Directory.Build.props`.
-2. `dotnet build {Solution}` sem erro. Warnings novos entram no relatório final; não são corrigidos aqui.
-3. `dotnet test {Solution} --no-build` verde, quando a solution tem projeto de teste.
+1. Reavaliar cada projeto com `dotnet msbuild {csproj} -getProperty:...` e comparar com a linha de base: `Nullable` e `ImplicitUsings` iguais (vazio e `disable` equivalem; `true` e `enable` equivalem); `TargetFramework` e `LangVersion` idênticos; `PublishAot` e `SatelliteResourceLanguages` iguais aos do `Directory.Build.props`; `AssemblyName` igual ao nome do arquivo `.csproj`. As diferenças esperadas vão para o relatório.
+2. `dotnet sln {Solution} list` sem erro, e cada caminho de entrada da solution alterada existe em disco.
+3. `dotnet build {Solution}` sem erro. Warnings novos entram no relatório final; não são corrigidos aqui.
+4. `dotnet test {Solution} --no-build` verde, quando a solution tem projeto de teste.
 
 Se algum comando falhar por erro de ambiente/ferramenta (timeout, processo que não inicia, feed
 indisponível) em vez de reprovar por conteúdo, não trate como passo concluído: tente de novo uma
@@ -186,5 +190,6 @@ vez e, se persistir, reporte ao usuário como Harness incompleto e pare — não
 como concluída.
 
 Relatório final: ao concluir (ou ao parar), apresente as tabelas da seção "Relatório final" de
-`report.md`: o que foi feito por linha, arquivos criados e movidos, projetos editados, resultado do
-Harness e o que ficou fora do escopo.
+`report.md`: o que foi feito por linha, arquivos criados e movidos, entradas da solution
+atualizadas, projetos editados (com `AssemblyName` removido), resultado do Harness e o que ficou
+fora do escopo.

@@ -1,0 +1,6 @@
+# https://github.com/dotnet/roslyn-analyzers/blob/master/src/Microsoft.CodeAnalysis.BannedApiAnalyzers/BannedApiAnalyzers.Help.md
+P:System.DateTime.Now;Use System.DateTime.UtcNow instead
+P:System.DateTimeOffset.Now;Use System.DateTimeOffset.UtcNow instead
+P:System.DateTimeOffset.DateTime;Use System.DateTimeOffset.UtcDateTime instead
+T:Newtonsoft.Json;Don't use Newtonsoft, use System.Text.Json
+T:Newtonsoft.Json.JsonPropertyAttribute;Don't use Newtonsoft
