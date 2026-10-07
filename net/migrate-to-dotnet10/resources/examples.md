@@ -2,40 +2,53 @@
 
 Exemplos de apoio da skill `SKILL.md`. Em conflito com o Template canônico, o Template vence.
 
-Estado antes, solution com três projetos, todos `net8.0`:
-- `Domain.csproj`: `Nullable` `enable`, `ImplicitUsings` `enable`.
-- `Application.csproj`: `Nullable` `enable`, `ImplicitUsings` ausente.
-- `Infrastructure.csproj`: `Nullable` ausente, `ImplicitUsings` `enable`.
+## Framework e LangVersion
+Estado antes: `Directory.Build.props` com `Nullable` e `ImplicitUsings`; `Api.csproj` e
+`Domain.csproj` com `<TargetFramework>net8.0</TargetFramework>`.
 
-Cálculo: `Nullable` é misto (`enable`, `enable`, `disable`) e `ImplicitUsings` é misto (`enable`,
-`disable`, `enable`), então o `Directory.Build.props` fica com `enable` nos dois. A `Application`
-precisa de `ImplicitUsings` `disable` explícito, e a `Infrastructure` precisa de `Nullable`
-`disable` explícito.
-
-Errado — sem contexto: `TargetFramework` mantido, diretivas repetidas, `Application` sem a
-diretiva explícita (herdaria `enable` e mudaria de comportamento), `RootNamespace` ausente:
+Errado — sem contexto: `TargetFramework` repetido no `.csproj` e `Directory.Build.props`
+reescrito do zero, perdendo as outras propriedades:
 ```xml
-<!-- Application.csproj -->
+<!-- Directory.Build.props -->
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+
+<!-- Domain.csproj -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+```
+
+Certo — com contexto (depois da skill):
+```xml
+<!-- Directory.Build.props: só as duas linhas entram; o resto fica como estava -->
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 </Project>
-```
 
-Certo — com contexto (`Application.csproj`, depois da skill):
-```xml
+<!-- Domain.csproj: sem TargetFramework nem LangVersion -->
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>Bank.Application</RootNamespace>
-    <ImplicitUsings>disable</ImplicitUsings>
-  </PropertyGroup>
 </Project>
 ```
-O `Domain.csproj` fica só com `RootNamespace`. O `Infrastructure.csproj` fica com `RootNamespace` e
-`<Nullable>disable</Nullable>`.
 
-Diferença: `TargetFramework` e `Nullable` saem porque o `Directory.Build.props` os define (CONV-001);
-a diretiva `disable` só permanece onde o projeto divergia do valor global; `RootNamespace` vem do
-namespace declarado nos `.cs` do projeto; nenhum pacote novo apareceu.
+Diferença: o `.csproj` não repete o que o `Directory.Build.props` define (CONV-001); as propriedades
+que a skill não gerencia permanecem; o `PropertyGroup` que ficou vazio foi removido.
+
+## Escolha de versão de pacote
+| Pacote | Versão hoje | Candidata | Decisão |
+|---|---|---|---|
+| `Microsoft.AspNetCore.OpenApi` | `8.0.8` | `10.0.x` estável | certo: atualizar para a maior `10.0.x` estável |
+| `Microsoft.AspNetCore.OpenApi` | `8.0.8` | `11.0.0-preview.1` | errado: prerelease e major 11 |
+| `FluentValidation` | `11.9.0` | `11.x` estável | certo: atualizar dentro da major atual |
+| `FluentValidation` | `11.9.0` | próxima major | errado: sem necessidade comprovada pelo build; só sobe se a versão atual não compilar em `net10.0`, e a subida é relatada |
+| Pacote sem versão estável compatível | `2.3.0` | nenhuma | certo: manter `2.3.0` e relatar o motivo |
