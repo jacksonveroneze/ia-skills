@@ -8,7 +8,7 @@
 # Só remove symlinks; arquivo real em references/ nunca é apagado.
 # Apaga references/ apenas se ficar vazia.
 
-#!/usr/bin/env bash
+#!/bin/bash
 
 set -euo pipefail
 
