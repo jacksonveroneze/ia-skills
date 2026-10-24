@@ -1,6 +1,6 @@
 ---
 name: comment-trello-card
-description: 'Publica um comentário em um card do Trello, em duas partes: mostra o card e o texto exato (preview, só leitura) e só publica depois da confirmação explícita do usuário. Só segue com o link ou id do card, o texto do comentário e a confirmação; sem a confirmação não escreve nada. Funciona sozinha, sem depender de arquivo, de etapas ou de outra skill. Use quando o usuário pedir para comentar, registrar ou avisar algo em um card do Trello. Não use para criar, editar, mover ou excluir cards, nem para alterar labels, membros ou checklists.'
+description: 'Publica um comentário em um card do Trello, em duas partes: mostra o card e o texto exato (preview, só leitura) e só publica depois da autorização explícita (resposta do usuário ou autorização prévia declarada por quem chama). Só segue com o link ou id do card, o texto do comentário e a autorização; sem ela não escreve nada. Funciona sozinha, sem depender de arquivo, de etapas ou de outra skill. Use quando o usuário pedir para comentar, registrar ou avisar algo em um card do Trello. Não use para criar, editar, mover ou excluir cards, nem para alterar labels, membros ou checklists.'
 ---
 
 # Comentar em card do Trello
@@ -19,7 +19,7 @@ O relatório de `references/report.md`. Nada além disso: não edita o card, nã
 ### Rules desta skill
 - **Local (dados obrigatórios):** só começa com o link ou id do card e o texto do comentário. Faltando, pede só o que falta.
 - **Local (duas partes):** a Parte A (preview) é só leitura. A Parte B (publicar) só roda após a confirmação explícita.
-- **Local (confirmação):** é a resposta do usuário que autoriza publicar este comentário neste card (por exemplo, "sim, pode comentar"). Elogio ou comentário sobre o preview não conta. Sem confirmação, não escreve nada.
+- **Local (autorização):** é a resposta do usuário que autoriza publicar este comentário neste card (por exemplo, "sim, pode comentar"), ou uma autorização prévia declarada por quem chama a skill (por exemplo, uma automação configurada), citando o que a concede. Elogio ou comentário sobre o preview não conta. Sem nenhuma das duas, não escreve nada; nunca crie a autorização por conta própria.
 - **Local (texto fiel):** publique exatamente o texto mostrado no preview. Alterou o texto: novo preview e nova confirmação.
 - **Local (dados protegidos):** o texto não pode conter segredo, token nem dado pessoal. Se contiver, pare e peça a correção.
 - **Local (não duplicar):** leia os comentários do card; se já existe um idêntico, avise e pergunte.
@@ -31,7 +31,7 @@ O relatório de `references/report.md`. Nada além disso: não edita o card, nã
 Conector do Trello ativo e card acessível. Falta algo: pare e diga o que falta.
 
 ### Inputs
-Obrigatórios: 1. **Link ou id** do card. 2. **Texto** do comentário. 3. **Confirmação explícita**, antes da Parte B.
+Obrigatórios: 1. **Link ou id** do card. 2. **Texto** do comentário. 3. **Autorização**, antes da Parte B: resposta explícita do usuário ou autorização prévia declarada por quem chama.
 Faltando: pergunte só o que falta. Inválido: card inexistente ou sem acesso.
 
 ## Fluxo (ReAct)
@@ -62,7 +62,7 @@ Leia `references/examples.md` antes de escrever.
 
 ## Checklist (autoverificação)
 - [ ] Card e texto informados antes de qualquer leitura ou escrita.
-- [ ] Confirmação explícita recebida antes de publicar.
+- [ ] Autorização explícita (do usuário ou prévia, citada) recebida antes de publicar.
 - [ ] Texto publicado idêntico ao do preview e sem dado protegido.
 - [ ] Comentário conferido no card após publicar.
 

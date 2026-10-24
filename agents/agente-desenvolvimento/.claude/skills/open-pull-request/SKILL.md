@@ -1,6 +1,6 @@
 ---
 name: open-pull-request
-description: 'Cria uma branch com nome relevante a partir das mudanças locais, faz o commit e abre um Pull Request para a branch base, com título e descrição em padrão fixo, em duas partes: mostra o preview (só leitura) e só escreve depois da confirmação explícita do usuário. Só segue com o repositório, a branch base, o tipo, o resumo, os arquivos esperados e a confirmação; sem a confirmação não cria branch, commit, push nem PR. Funciona sozinha, sem depender de arquivo, de etapas ou de outra skill. Use quando o usuário pedir para abrir um PR, subir as mudanças ou criar uma branch com commit. Não use para merge, force-push, fechar PR, apagar branch ou escrever código.'
+description: 'Cria uma branch com nome relevante a partir das mudanças locais, faz o commit e abre um Pull Request para a branch base, com título e descrição em padrão fixo, em duas partes: mostra o preview (só leitura) e só escreve depois da autorização explícita (resposta do usuário ou autorização prévia declarada por quem chama). Só segue com o repositório, a branch base, o tipo, o resumo, os arquivos esperados e a autorização; sem ela não cria branch, commit, push nem PR. Funciona sozinha, sem depender de arquivo, de etapas ou de outra skill. Use quando o usuário pedir para abrir um PR, subir as mudanças ou criar uma branch com commit. Não use para merge, force-push, fechar PR, apagar branch ou escrever código.'
 ---
 
 # Abrir Pull Request
@@ -19,7 +19,7 @@ O relatório de `references/report.md`. Nada além disso: não escreve código, 
 ### Rules desta skill
 - **Local (dados obrigatórios):** só começa com repositório, branch base, tipo, resumo, arquivos esperados e a confirmação (na Parte B). Faltando, pede só o que falta; nunca infere.
 - **Local (duas partes):** a Parte A (preview) é só leitura. A Parte B (criar) só roda após a confirmação explícita.
-- **Local (confirmação):** é a resposta do usuário que autoriza criar esta branch, este commit e este PR (por exemplo, "sim, pode abrir"). Comentário sobre o preview não conta. Sem confirmação, não escreve nada.
+- **Local (autorização):** é a resposta do usuário que autoriza criar esta branch, este commit e este PR (por exemplo, "sim, pode abrir"), ou uma autorização prévia declarada por quem chama a skill (por exemplo, uma automação configurada), citando o que a concede. Comentário sobre o preview não conta. Sem nenhuma das duas, não escreve nada; nunca crie a autorização por conta própria.
 - **Local (arquivos):** só entram no commit os arquivos esperados. Arquivo alterado fora da lista, ou esperado e sem mudança: pare e informe. Nunca `git add .`.
 - **Local (branch):** nome `<tipo>/<slug>`, com tipo `feat`, `fix`, `docs` ou `spec`, e slug em minúsculas, hífens e até 5 palavras, derivado do resumo. Branch com esse nome já existe: avise e pergunte.
 - **Local (padrão de escrita):** commit e título do PR em Conventional Commits: `<tipo>(<escopo>): <descrição no imperativo>`, até 72 caracteres no título. Descrição do PR com as seções fixas: Contexto, O que muda, Como testar, Link de origem, Checklist.
@@ -38,7 +38,7 @@ Obrigatórios:
 1. **Repositório** (org/repo) e **branch base**.
 2. **Tipo** (`feat`, `fix`, `docs`, `spec`) e **resumo** do que foi feito.
 3. **Arquivos esperados** no commit.
-4. **Confirmação explícita**, antes da Parte B.
+4. **Autorização**, antes da Parte B: resposta explícita do usuário ou autorização prévia declarada por quem chama.
 
 Opcionais: escopo do commit; link ou identificação de origem (por exemplo, o card); critérios atendidos; comandos executados e resultado.
 
@@ -77,7 +77,7 @@ Leia `references/examples.md` antes de escrever.
 ## Checklist (autoverificação)
 - [ ] Todos os inputs obrigatórios antes de qualquer leitura ou escrita.
 - [ ] Arquivos alterados iguais aos esperados.
-- [ ] Confirmação explícita recebida antes de criar branch, commit, push ou PR.
+- [ ] Autorização explícita (do usuário ou prévia, citada) recebida antes de criar branch, commit, push ou PR.
 - [ ] Branch, commit e título no padrão; descrição com as 5 seções.
 - [ ] PR conferido: base correta e arquivos esperados.
 

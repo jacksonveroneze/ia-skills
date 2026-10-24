@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="770" viewBox="0 0 680 770" role="img">
+<style>text{font-family:Arial,Helvetica,sans-serif}.th{font-size:14px;font-weight:bold;fill:#2C2C2A}.ts{font-size:12px;fill:#444441}.arr{stroke:#5F5E5A;stroke-width:1.5;fill:none}.c-purple rect,rect.c-purple{fill:#EEEDFE;stroke:#534AB7}.c-purple .th{fill:#26215C}.c-purple .ts{fill:#534AB7}.c-teal rect,rect.c-teal{fill:#E1F5EE;stroke:#0F6E56}.c-teal .th{fill:#04342C}.c-teal .ts{fill:#0F6E56}.c-coral rect,rect.c-coral{fill:#FAECE7;stroke:#993C1D}.c-coral .th{fill:#4A1B0C}.c-coral .ts{fill:#993C1D}.c-amber rect,rect.c-amber{fill:#FAEEDA;stroke:#854F0B}.c-amber .th{fill:#412402}.c-amber .ts{fill:#854F0B}.c-gray rect,rect.c-gray{fill:#F1EFE8;stroke:#5F5E5A}.c-gray .th{fill:#2C2C2A}.c-gray .ts{fill:#5F5E5A}.c-red rect,rect.c-red{fill:#FCEBEB;stroke:#A32D2D}.c-red .th{fill:#501313}.c-red .ts{fill:#A32D2D}</style>
+<rect width="680" height="770" fill="#ffffff"/>
+<title>Fluxo do agente de desenvolvimento e suas integrações</title>
+<desc>Cinco etapas em sequência com os gates do usuário entre elas, os subagents e skills de cada etapa, as integrações com Trello, Git e GitHub, e o desvio para o estado bloqueado.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<line x1="115" y1="102" x2="115" y2="126" class="arr"/>
+<line x1="115" y1="150" x2="115" y2="168" class="arr" marker-end="url(#arrow)"/>
+<line x1="115" y1="222" x2="115" y2="246" class="arr"/>
+<line x1="115" y1="270" x2="115" y2="288" class="arr" marker-end="url(#arrow)"/>
+<line x1="115" y1="342" x2="115" y2="366" class="arr"/>
+<line x1="115" y1="390" x2="115" y2="408" class="arr" marker-end="url(#arrow)"/>
+<line x1="115" y1="462" x2="115" y2="486" class="arr"/>
+<line x1="115" y1="510" x2="115" y2="528" class="arr" marker-end="url(#arrow)"/>
+<line x1="115" y1="582" x2="115" y2="606" class="arr"/>
+<line x1="115" y1="630" x2="115" y2="652" class="arr" marker-end="url(#arrow)"/>
+
+<line x1="190" y1="76" x2="213" y2="76" class="arr"/>
+<path d="M213 76 L213 62 L234 62" fill="none" class="arr" marker-end="url(#arrow)"/>
+<path d="M213 76 L213 114 L234 114" fill="none" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="62" x2="506" y2="62" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="114" x2="506" y2="114" class="arr" marker-end="url(#arrow)"/>
+<line x1="190" y1="196" x2="234" y2="196" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="196" x2="506" y2="196" class="arr" marker-end="url(#arrow)"/>
+<line x1="190" y1="316" x2="213" y2="316" class="arr"/>
+<path d="M213 316 L213 284 L234 284" fill="none" class="arr" marker-end="url(#arrow)"/>
+<path d="M213 316 L213 336 L234 336" fill="none" class="arr" marker-end="url(#arrow)"/>
+<path d="M213 316 L213 388 L234 388" fill="none" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="388" x2="506" y2="388" class="arr" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<line x1="190" y1="436" x2="234" y2="436" class="arr" marker-end="url(#arrow)"/>
+<path d="M400 446 L574 446 L574 432" fill="none" class="arr" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<line x1="190" y1="556" x2="213" y2="556" class="arr"/>
+<path d="M213 556 L213 542 L234 542" fill="none" class="arr" marker-end="url(#arrow)"/>
+<path d="M213 556 L213 594 L234 594" fill="none" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="542" x2="506" y2="542" class="arr" marker-end="url(#arrow)"/>
+<line x1="400" y1="594" x2="506" y2="594" class="arr" marker-end="url(#arrow)"/>
+
+<g class="c-purple"><rect x="40" y="50" width="150" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="68" text-anchor="middle" dominant-baseline="central">1. Leitura</text>
+<text class="ts" x="115" y="86" text-anchor="middle" dominant-baseline="central">Card e preflight</text></g>
+<g class="c-purple"><rect x="40" y="170" width="150" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="188" text-anchor="middle" dominant-baseline="central">2. Plano</text>
+<text class="ts" x="115" y="206" text-anchor="middle" dominant-baseline="central">Lê a referência</text></g>
+<g class="c-purple"><rect x="40" y="290" width="150" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="308" text-anchor="middle" dominant-baseline="central">3. Código</text>
+<text class="ts" x="115" y="326" text-anchor="middle" dominant-baseline="central">Testes e comandos</text></g>
+<g class="c-purple"><rect x="40" y="410" width="150" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="428" text-anchor="middle" dominant-baseline="central">4. Revisão</text>
+<text class="ts" x="115" y="446" text-anchor="middle" dominant-baseline="central">Confere o diff</text></g>
+<g class="c-purple"><rect x="40" y="530" width="150" height="52" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="548" text-anchor="middle" dominant-baseline="central">5. Entrega</text>
+<text class="ts" x="115" y="566" text-anchor="middle" dominant-baseline="central">Preview e envio</text></g>
+<g class="c-purple"><rect x="40" y="654" width="150" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="115" y="668" text-anchor="middle" dominant-baseline="central">Concluído</text>
+<text class="ts" x="115" y="685" text-anchor="middle" dominant-baseline="central">PR e comentário</text></g>
+
+<g class="c-amber"><rect x="50" y="126" width="130" height="24" rx="12" stroke-width="0.5"/>
+<text class="ts" x="115" y="138" text-anchor="middle" dominant-baseline="central">AVANÇAR</text></g>
+<g class="c-amber"><rect x="50" y="246" width="130" height="24" rx="12" stroke-width="0.5"/>
+<text class="ts" x="115" y="258" text-anchor="middle" dominant-baseline="central">APROVAR PLANO</text></g>
+<g class="c-amber"><rect x="50" y="366" width="130" height="24" rx="12" stroke-width="0.5"/>
+<text class="ts" x="115" y="378" text-anchor="middle" dominant-baseline="central">AVANÇAR (2 vezes)</text></g>
+<g class="c-amber"><rect x="50" y="486" width="130" height="24" rx="12" stroke-width="0.5"/>
+<text class="ts" x="115" y="498" text-anchor="middle" dominant-baseline="central">AVANÇAR</text></g>
+<g class="c-amber"><rect x="50" y="606" width="130" height="24" rx="12" stroke-width="0.5"/>
+<text class="ts" x="115" y="618" text-anchor="middle" dominant-baseline="central">APROVAR PR</text></g>
+
+<g class="c-teal"><rect x="236" y="40" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="55" text-anchor="middle" dominant-baseline="central">read-trello-card</text>
+<text class="ts" x="318" y="72" text-anchor="middle" dominant-baseline="central">Lê e valida o card</text></g>
+<g class="c-teal"><rect x="236" y="92" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="107" text-anchor="middle" dominant-baseline="central">preflight</text>
+<text class="ts" x="318" y="124" text-anchor="middle" dominant-baseline="central">12 verificações</text></g>
+<g class="c-teal"><rect x="236" y="174" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="189" text-anchor="middle" dominant-baseline="central">code-explorer</text>
+<text class="ts" x="318" y="206" text-anchor="middle" dominant-baseline="central">Resume a referência</text></g>
+<g class="c-teal"><rect x="236" y="262" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="277" text-anchor="middle" dominant-baseline="central">test-writer</text>
+<text class="ts" x="318" y="294" text-anchor="middle" dominant-baseline="central">Testes pelos critérios</text></g>
+<g class="c-teal"><rect x="236" y="314" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="329" text-anchor="middle" dominant-baseline="central">dotnet-implementer</text>
+<text class="ts" x="318" y="346" text-anchor="middle" dominant-baseline="central">Código, até 3 tentativas</text></g>
+<g class="c-teal"><rect x="236" y="366" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="381" text-anchor="middle" dominant-baseline="central">Comandos do card</text>
+<text class="ts" x="318" y="398" text-anchor="middle" dominant-baseline="central">Build, teste e lint</text></g>
+<g class="c-teal"><rect x="236" y="424" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="439" text-anchor="middle" dominant-baseline="central">reviewer</text>
+<text class="ts" x="318" y="456" text-anchor="middle" dominant-baseline="central">Reprova: até 2 ciclos</text></g>
+<g class="c-teal"><rect x="236" y="520" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="535" text-anchor="middle" dominant-baseline="central">open-pull-request</text>
+<text class="ts" x="318" y="552" text-anchor="middle" dominant-baseline="central">Branch, commit e PR</text></g>
+<g class="c-teal"><rect x="236" y="572" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="587" text-anchor="middle" dominant-baseline="central">comment-trello-card</text>
+<text class="ts" x="318" y="604" text-anchor="middle" dominant-baseline="central">Comenta no card</text></g>
+
+<g class="c-coral"><rect x="508" y="40" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="55" text-anchor="middle" dominant-baseline="central">Trello</text>
+<text class="ts" x="574" y="72" text-anchor="middle" dominant-baseline="central">Lê o card</text></g>
+<g class="c-coral"><rect x="508" y="92" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="107" text-anchor="middle" dominant-baseline="central">Git e GitHub</text>
+<text class="ts" x="574" y="124" text-anchor="middle" dominant-baseline="central">Confere o ambiente</text></g>
+<g class="c-coral"><rect x="508" y="174" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="189" text-anchor="middle" dominant-baseline="central">Repositório</text>
+<text class="ts" x="574" y="206" text-anchor="middle" dominant-baseline="central">Lê o código</text></g>
+<g class="c-coral"><rect x="508" y="520" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="535" text-anchor="middle" dominant-baseline="central">GitHub</text>
+<text class="ts" x="574" y="552" text-anchor="middle" dominant-baseline="central">Cria branch e PR</text></g>
+<g class="c-coral"><rect x="508" y="572" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="587" text-anchor="middle" dominant-baseline="central">Trello</text>
+<text class="ts" x="574" y="604" text-anchor="middle" dominant-baseline="central">Publica o comentário</text></g>
+
+<g class="c-red"><rect x="508" y="366" width="132" height="66" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="390" text-anchor="middle" dominant-baseline="central">Bloqueado</text>
+<text class="ts" x="574" y="410" text-anchor="middle" dominant-baseline="central">Oferece COMENTAR</text></g>
+
+<g class="c-gray"><rect x="236" y="654" width="164" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="318" y="669" text-anchor="middle" dominant-baseline="central">fluxo.md</text>
+<text class="ts" x="318" y="686" text-anchor="middle" dominant-baseline="central">Estados, gates e modo</text></g>
+<g class="c-gray"><rect x="508" y="654" width="132" height="44" rx="8" stroke-width="0.5"/>
+<text class="th" x="574" y="669" text-anchor="middle" dominant-baseline="central">estado.json</text>
+<text class="ts" x="574" y="686" text-anchor="middle" dominant-baseline="central">Progresso e retomada</text></g>
+
+<rect class="c-purple" x="40" y="722" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="60" y="729" dominant-baseline="central">Etapa</text>
+<rect class="c-teal" x="150" y="722" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="170" y="729" dominant-baseline="central">Skill ou subagent</text>
+<rect class="c-coral" x="310" y="722" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="330" y="729" dominant-baseline="central">Integração externa</text>
+<rect class="c-amber" x="470" y="722" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="490" y="729" dominant-baseline="central">Gate do usuário</text>
+<rect class="c-gray" x="40" y="746" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="60" y="753" dominant-baseline="central">Arquivo</text>
+<rect class="c-red" x="150" y="746" width="14" height="14" rx="3" stroke-width="0.5"/>
+<text class="ts" x="170" y="753" dominant-baseline="central">Bloqueio (linha tracejada)</text>
+</svg>

@@ -39,6 +39,11 @@ Pedido: "Comenta no card <link>: 'Revisão concluída'."
 - Correto: Parte A, mostrar o preview e esperar a confirmação; só então publicar.
 - Errado: publicar direto porque o pedido já dizia "comenta".
 
+## Autorização prévia
+Quem chama informa: "Autorização prévia: automação configurada, permite comentar neste card."
+- Correto: fazer a Parte A, registrar a autorização citada e publicar sem esperar resposta.
+- Errado: publicar sem autorização informada, ou inventar "autorizado por padrão".
+
 ## Pedido incompleto
 Pedido: "Comenta no card." (sem link nem texto)
 - Correto: perguntar o card e o texto. Não ler nem escrever.

@@ -67,6 +67,11 @@ Pedido: "Abre um PR com estas mudanças para a develop. Tipo fix: corrige timeou
 - Correto: Parte A, preview e espera da confirmação; só então criar.
 - Errado: criar direto porque o pedido já dizia "abre".
 
+## Autorização prévia
+Quem chama informa: "Autorização prévia: automação configurada, permite criar branch, commit e PR para main."
+- Correto: fazer a Parte A, registrar no relatório a autorização citada e executar a Parte B sem esperar resposta.
+- Errado: executar a Parte B sem que ninguém tenha informado a autorização, ou inventar "autorizado por padrão".
+
 ## Pedido incompleto
 Pedido: "Sobe isso pro GitHub." (sem base, tipo ou arquivos)
 - Correto: perguntar só o que falta, nessa ordem: base, tipo, resumo, arquivos.

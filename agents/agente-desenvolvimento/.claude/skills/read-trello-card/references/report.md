@@ -4,8 +4,10 @@ Formato fixo.
 
 ```
 Card: <título> | Link: <link>
-Labels: <lista | nenhuma> | Membros: <lista | nenhum>
-Depende de: <texto da descrição | ausente> | Cards citados: <links | nenhum>
+Labels: <lista | nenhuma>
+Membros: <lista | nenhum>
+Depende de: <texto da descrição | ausente>
+Cards citados: <links | nenhum>
 
 Seções da descrição (cópia fiel):
 - Tipo: <valor | ausente>
@@ -14,7 +16,9 @@ Seções da descrição (cópia fiel):
 - Especificação técnica: <texto completo | ausente>
 - Prontidão para codificar: <valor | ausente>
 
-Checklist: <itens com estado | nenhum>
+Checklist: <nenhum | por checklist:>
+- <nome da checklist>
+  - [<completo | incompleto>] <item>
 
 Completude da especificação técnica:
 | Item | Estado |

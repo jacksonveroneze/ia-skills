@@ -4,7 +4,8 @@ Formato fixo, por parte.
 
 ## Parte A - Preview
 ```
-Repositório: <org/repo> | Base: <branch base>
+Repositório: <org/repo>
+Base: <branch base>
 Branch: <tipo>/<slug>
 Commit: <tipo>(<escopo>): <descrição>
 Título do PR: <tipo>(<escopo>): <descrição>
